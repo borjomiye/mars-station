@@ -1,0 +1,1709 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mars Outpost — greybox</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #111; overflow: hidden; }
+  canvas { display: block; margin: 0 auto; background: #1b1b1b; touch-action: manipulation; outline: none; }
+</style>
+</head>
+<body>
+<canvas id="c" tabindex="0"></canvas>
+<script>
+"use strict";
+/* =====================================================================================
+   MARS OUTPOST — GREYBOX (только механики, без дизайна)
+   Разделы файла:
+     1. CONFIG            — все числа баланса (правьте здесь)
+     2. DATA              — экипаж, события, карточки, окно DONKI, тексты
+     3. ENGINE            — чистые функции: состояние → новое состояние (детерминировано сидом)
+     4. BOT + SELF-TEST   — автопрохождение и проверки (клавиша T или MarsOutpost.selfTest())
+     5. UI                — Canvas, immediate-mode кнопки, машина состояний экранов
+   Консоль: MarsOutpost.CONFIG, MarsOutpost.state, MarsOutpost.balanceReport(50)
+   ===================================================================================== */
+
+/* ============================== 1. CONFIG ============================== */
+const CONFIG = {
+  // --- миссия и баки ---
+  MISSION_SOLS: 15,            // длина миссии в солах
+  ZERO_SOLS_TO_LOSE: 2,        // сколько солов подряд бак на нуле = досрочный возврат
+  TANK_MAX: 10,                // ёмкость баков воздуха/воды и еды
+  AIR_START: 8,
+  FOOD_START: 7,
+  FOOD_EATEN_PER_SOL: 1,
+
+  // --- энергия (5.1) ---
+  CELLS_BY_WEATHER: { clear: 9, hazy: 7, dust: 5 },
+  SYSTEMS: {                   // want = сколько система просит; max = сколько можно дать; unlockSol = с какого сола доступна
+    life:       { name: 'Life support',     want: 3, max: 4, unlockSol: 1 },
+    shield:     { name: 'Radiation shield', want: 3, max: 3, unlockSol: 2 },
+    greenhouse: { name: 'Greenhouse',       want: 3, max: 3, unlockSol: 1 },
+    radio:      { name: 'Radio',            want: 1, max: 1, unlockSol: 3 },
+    lab:        { name: 'Lab',              want: 2, max: 2, unlockSol: 4 },
+  },
+  TRIM_ORDER: ['lab', 'radio', 'greenhouse', 'shield', 'life'], // что обрезается первым, если ячеек стало меньше
+  AIR_LOSS_PER_MISSING_CELL: 1,  // воздух за каждую недоданную ячейку жизнеобеспечения
+  AIR_GAIN_PER_EXTRA_CELL: 1,    // воздух за ячейку сверх want (единственный способ восполнить бак)
+  BATTERY_CAPACITY: 0,           // 0 = лишние ячейки сгорают на закате; 2 = вариант «батарея» из раздела «Later»
+
+  // --- теплица (5.4) ---
+  CROP_STEPS_TO_HARVEST: 12,
+  HARVEST_FOOD: 2,
+  STEPS_PER_GREENHOUSE_CELL: 1,
+  GROW_NEEDS_LIGHT: true,        // при 0 ячеек в теплице помощь экипажа не работает
+
+  // --- экипаж и работы (5.2) ---
+  JOB_UNLOCK_SOL: 2,
+  JOB_OUTPUT: { grow: 1, fix: 1, outside: 1, lab: 1, care: 0.5 }, // базовая отдача работы за сол
+  SPECIALIST_OF: { engineer: 'fix', medic: 'care', botanist: 'grow', scientist: 'lab', pilot: 'outside' },
+  SPECIALIST_MULT: 2,
+  HEAVY_JOBS: ['fix', 'outside', 'rewire'],
+  HEAVY_SOLS_TO_TIRED: 2,        // тяжёлых солов подряд до усталости
+  TIRED_EFFECT: 0.5,             // множитель отдачи уставшего
+  TIRED_HEAVY_WORK_INJURES: true,// уставший на тяжёлой работе → травма (детерминированно, без броска)
+  INJURY_MEDBAY_STEPS: 2,
+  ILLNESS_MEDBAY_STEPS: 2,
+  SICK_WORK_MEDBAY_STEPS: 3,     // если больной работал
+  MEDBAY_HEAL_PER_SOL: 1,
+  SICK_REST_SOLS_TO_CURE: 2,
+  SICK_EFFECT: 0.5,
+
+  // --- радиация (5.3), вариант D1-C: реальные мЗв за сол ---
+  DOSE_INDOOR_PER_SOL: 0.67,
+  DOSE_OUTSIDE_TRIP: 1.0,
+  STORM_MULT_BY_DAY: [3, 2],     // множитель дозы по дням солнечной бури
+  SHELTER_EXPOSURE: 0.5,         // доля незащищённой дозы в укрытии
+  BADGE_AMBER_MSV: 13.0,
+  BADGE_RED_MSV: 15.0,
+  RED_BADGE_GROUNDS: true,       // красный значок = больше не выходит наружу
+
+  // --- лаборатория и наука (5.7) ---
+  LAB_WORK_PER_SAMPLE: 2,
+  CHANCE_SAMPLES: 1,
+  SCIENCE_TARGET: 20,
+  SCIENCE_PER_CARD: { chance: 3, lab: 2, milestone: 1 },
+
+  // --- радио (5.5) ---
+  BLACKOUT_SOLS: [11, 12],
+  RADIO_FORECAST_SOLS: 2,        // на сколько солов вперёд прогноз по радио
+  AUTO_FORECAST_SOLS: 0,         // бесплатный прогноз каждое утро (Cadet = 1)
+
+  // --- поломки (5.6): work = труд на починку, airLeak = утечка за сол, growEvery = раз во сколько солов хуже ---
+  PROBLEMS: {
+    loose_pipe:   { name: 'Loose pipe',   where: 'inside',  work: 1, airLeak: 1, growEvery: 2, maxSeverity: 3, airOnFix: 0 },
+    pump_broken:  { name: 'Broken pump',  where: 'inside',  work: 2, airLeak: 1, growEvery: 2, maxSeverity: 3, airOnFix: 1 },
+    hull_crack:   { name: 'Hull crack',   where: 'outside', work: 2, airLeak: 1, growEvery: 2, maxSeverity: 3, airOnFix: 0 },
+    lamp_fault:   { name: 'Lamp fault',   where: 'inside',  work: 2, airLeak: 0, growEvery: 2, maxSeverity: 3, airOnFix: 0, growthFactor: [0.5, 0.25, 0] },
+    antenna_off:  { name: 'Antenna off',  where: 'outside', work: 1, airLeak: 0, growEvery: 3, maxSeverity: 2, airOnFix: 0, blocksRadio: true },
+    dusty_panels: { name: 'Dusty panels', where: 'outside', work: 1, airLeak: 0, growEvery: 0, maxSeverity: 1, airOnFix: 0, cellsLost: 1 },
+  },
+  WORK_PER_SEVERITY: 1,          // доп. труд за каждый уровень запущенности
+  MIN_REPAIR_WORK: 0.5,
+
+  // --- расписание событий (5.6, 6) ---
+  TUTORIAL_TROUBLE_SOL: 2,
+  TUTORIAL_TROUBLE: 'loose_pipe',
+  FIRST_CHANCE_SOL: 4,
+  RANDOM_TROUBLES: 4,           // случайных поломок в солах 5..14 (кроме бурь)
+  CHANCES_TOTAL: 4,
+  TROUBLE_POOL: ['hull_crack', 'pump_broken', 'sick_crew', 'lamp_fault', 'antenna_off', 'power_fault'],
+  CHANCE_POOL: ['striped_rock', 'dawn_frost', 'dust_devil', 'blue_sunset', 'clean_wind'],
+  HAZY_CHANCE: 0.4,
+  CLEAR_UNTIL_SOL: 3,
+  DUST_START_MIN: 9, DUST_START_MAX: 11, DUST_LEN_MIN: 2, DUST_LEN_MAX: 3,
+  STORM_MIN_SOL: 5, STORM_MAX_SOL: 13, // в какие солы может попасть реальная буря из DONKI
+  WIND_BONUS_CELLS: 2, WIND_POLISH_CELLS: 1, WIND_POLISH_SOLS: 4,
+
+  // --- звёзды (8.1) ---
+  THIRD_STAR_RULE: 'both',       // 'both' | 'medbay' | 'green'
+
+  // --- подача по режимам ---
+  HELPER_ALWAYS_ON: false,
+  SHOW_MSV: true,
+};
+// Отличия режимов (раздел 7): один движок, два файла баланса.
+const MODE_OVERRIDES = {
+  cadet:     { AIR_START: 10, FOOD_START: 9, STORM_MULT_BY_DAY: [2, 1.5], AUTO_FORECAST_SOLS: 1, HELPER_ALWAYS_ON: true, SHOW_MSV: false },
+  commander: {},
+};
+
+/* ============================== 2. DATA ============================== */
+const CREW = [
+  { id: 'leo',   name: 'Leo',   role: 'engineer' },
+  { id: 'mei',   name: 'Mei',   role: 'medic' },
+  { id: 'amara', name: 'Amara', role: 'botanist' },
+  { id: 'otto',  name: 'Otto',  role: 'scientist' },
+  { id: 'sam',   name: 'Sam',   role: 'pilot' },
+];
+const JOB_KEYS = ['grow', 'fix', 'outside', 'lab', 'care', 'rest'];
+const SYS_KEYS = ['life', 'shield', 'greenhouse', 'radio', 'lab'];
+
+// ВНИМАНИЕ: окно ниже — ПЛЕЙСХОЛДЕР (verified: false). Даты записаны по памяти, а не скачаны из DONKI:
+// на момент сборки api.nasa.gov отвечал 429, а kauai.ccmc.gsfc.nasa.gov отклонял соединение.
+// Перед показом заменить на JSON, скачанный при сборке (donki-windows.json из раздела 9).
+const DONKI_WINDOWS = [{
+  id: 'sep2017', verified: false, source: 'NASA DONKI', start: '2017-09-01', days: 20,
+  events: [
+    { type: 'FLR', date: '2017-09-06', label: 'Solar flare X9.3', seenAt: 'seen near Earth' },
+    { type: 'FLR', date: '2017-09-10', label: 'Solar flare X8.2', seenAt: 'seen near Earth' },
+    { type: 'SEP', date: '2017-09-10', label: 'Solar particle storm', seenAt: 'seen near Earth' },
+  ],
+}];
+
+const TROUBLES = {
+  loose_pipe:  { title: 'Loose water pipe',     line: 'A pipe drips. Air & water leaks until it is fixed.', problem: 'loose_pipe' },
+  pump_broken: { title: 'Broken pump',          line: 'The water pump stopped. Air & water leaks every sol.', problem: 'pump_broken' },
+  hull_crack:  { title: 'Crack in the hull',    line: 'A crack in module B. Air leaks out.', problem: 'hull_crack' },
+  lamp_fault:  { title: 'Greenhouse lamps flicker', line: 'The grow lamps are failing. Crops grow slower.', problem: 'lamp_fault' },
+  antenna_off: { title: 'Antenna knocked off',  line: 'The antenna points the wrong way. No radio.', problem: 'antenna_off' },
+  power_fault: { title: 'Blown fuse',           line: 'A fuse blew. Something must go dark today.' },
+  sick_crew:   { title: 'Someone feels ill',    line: 'A crew member woke up ill.' },
+  solar_storm: { title: 'Solar particle storm', line: 'Fast particles from the Sun. Everyone gets extra dose.' },
+  dust_storm:  { title: 'Dust storm',           line: 'Dust hides the Sun. Fewer cells for some sols.' },
+};
+const CHANCES = {
+  striped_rock: { title: 'Striped rock outside', line: 'A rock with stripes sits near the airlock.', card: 'layered_rock' },
+  dawn_frost:   { title: 'Frost at dawn',        line: 'White frost on the ground. Gone by noon.', card: 'morning_frost' },
+  dust_devil:   { title: 'Dust devil',           line: 'A whirlwind is crossing the plain.', card: 'dust_devil' },
+  blue_sunset:  { title: 'Blue sunset',          line: 'The sky is clear. Tonight the sunset will show.', card: 'blue_sunset' },
+  clean_wind:   { title: 'Wind cleaned the panels', line: 'A gust blew the dust off the solar panels.', card: null },
+};
+// 16 карточек альбома. Факты на карточках — контент, в greybox только название и способ получения.
+const CARDS = [
+  { id: 'layered_rock',   title: 'Layered rock',    kind: 'chance',    hint: 'Look at a strange rock' },
+  { id: 'blue_sunset',    title: 'Blue sunset',     kind: 'chance',    hint: 'Watch a clear sunset' },
+  { id: 'morning_frost',  title: 'Morning frost',   kind: 'chance',    hint: 'Catch the frost at dawn' },
+  { id: 'dust_devil',     title: 'Dust devil',      kind: 'chance',    hint: 'Follow a whirlwind' },
+  { id: 'lab_1',          title: 'Lab find 1',      kind: 'lab',       hint: 'Power the lab' },
+  { id: 'lab_2',          title: 'Lab find 2',      kind: 'lab',       hint: 'Study a second sample' },
+  { id: 'lab_3',          title: 'Lab find 3',      kind: 'lab',       hint: 'Study a third sample' },
+  { id: 'lab_4',          title: 'Lab find 4',      kind: 'lab',       hint: 'Study a fourth sample' },
+  { id: 'lab_5',          title: 'Lab find 5',      kind: 'lab',       hint: 'Study a fifth sample' },
+  { id: 'lab_6',          title: 'Lab find 6',      kind: 'lab',       hint: 'Study a sixth sample' },
+  { id: 'space_radishes', title: 'Space radishes',  kind: 'milestone', hint: 'Bring in a harvest' },
+  { id: 'storm_survived', title: 'Storm watcher',   kind: 'milestone', hint: 'Survive a storm' },
+  { id: 'first_call',     title: 'Hello, Earth',    kind: 'milestone', hint: 'Send a radio message' },
+  { id: 'bones',          title: 'Bones in space',  kind: 'milestone', hint: 'Ask the doctors' },
+  { id: 'dust_survived',  title: 'Dust storm',      kind: 'milestone', hint: 'Sit out a dust storm' },
+  { id: 'conjunction',    title: 'Sun in the way',  kind: 'milestone', hint: 'Live through the radio blackout' },
+];
+const WORDS = {
+  sol:   'Sol: one day on Mars.',
+  cell:  'Energy cell: one share of today\'s solar power.',
+  msv:   'Millisievert (mSv): a unit for radiation dose.',
+  flare: 'Solar flare: a sudden bright burst on the Sun.',
+  sep:   'Solar particle storm: fast particles from the Sun. They add dose.',
+  conj:  'Solar conjunction: the Sun sits between Mars and Earth.',
+};
+const NAME_A = ['Brave', 'Quiet', 'Clever', 'Swift', 'Kind', 'Bold', 'Lucky', 'Calm', 'Bright', 'Proud', 'Happy', 'Steady'];
+const NAME_B = ['Otter', 'Falcon', 'Fox', 'Panda', 'Robin', 'Whale', 'Lynx', 'Heron', 'Badger', 'Tiger', 'Koala', 'Owl'];
+
+/* ============================== 3. ENGINE ============================== */
+const PHASE = { BRIEFING: 'briefing', PLAN: 'plan', EVENT: 'event', RESULTS: 'results', RADIO: 'radio', REPORT: 'report' };
+// Машина состояний сола: какие переходы разрешены.
+const TRANSITIONS = {
+  briefing: ['plan'],
+  plan:     ['event', 'results'],
+  event:    ['plan', 'results'],
+  results:  ['radio', 'briefing', 'report'],
+  radio:    ['briefing', 'report'],
+  report:   [],
+};
+function go(s, to) {
+  if (!TRANSITIONS[s.phase].includes(to)) throw new Error('Bad transition ' + s.phase + ' -> ' + to);
+  s.phase = to; return s;
+}
+
+const clone = o => JSON.parse(JSON.stringify(o));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const r3 = v => Math.round(v * 1000) / 1000;
+const fmt = v => (Math.abs(v - Math.round(v)) < 1e-9 ? String(Math.round(v)) : (Math.round(v * 10) / 10).toFixed(1));
+const fmt2 = v => v.toFixed(2);
+const signed = v => (v > 0 ? '+' : '−') + fmt(Math.abs(v));
+const plural = (n, w) => fmt(n) + ' ' + w + (Math.abs(n - 1) < 1e-9 ? '' : 's');
+const wordCount = t => String(t).trim().split(/\s+/).filter(Boolean).length;
+function line15(t) { if (wordCount(t) > 15) console.warn('Over 15 words:', t); return t; }
+function cfg(mode) { return Object.assign({}, CONFIG, MODE_OVERRIDES[mode] || {}); }
+
+// --- сидированный ГСЧ: используется только при создании миссии ---
+function hashSeed(str) {
+  let h = 1779033703 ^ str.length;
+  for (let i = 0; i < str.length; i++) { h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
+  h = Math.imul(h ^ (h >>> 16), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909);
+  return (h ^ (h >>> 16)) >>> 0;
+}
+function makeRng(seed) {
+  let a = hashSeed(seed);
+  return function () {
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function normSeed(name) { return String(name || '').toLowerCase().replace(/\s+/g, ' ').trim().replace(/^mission /, '') || 'brave otter'; }
+function prettyName(name) { return normSeed(name).split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '); }
+function randomMissionName() { return NAME_A[Math.floor(Math.random() * NAME_A.length)] + ' ' + NAME_B[Math.floor(Math.random() * NAME_B.length)]; }
+
+// --- расписание миссии: погода, события, реальная космическая погода. Не зависит от режима. ---
+function buildSchedule(seed) {
+  const c = CONFIG, rng = makeRng(seed), N = c.MISSION_SOLS;
+  const ri = (a, b) => a + Math.floor(rng() * (b - a + 1));
+  const shuffle = arr => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; };
+  const days = [];
+  for (let i = 1; i <= N; i++) days.push({ sol: i, kind: 'quiet', eventId: null, weather: 'clear', storm: null, real: [], sickIdx: ri(0, CREW.length - 1) });
+  const setEv = (sol, kind, id) => { const d = days[sol - 1]; if (d && !d.eventId && id) { d.kind = kind; d.eventId = id; } };
+
+  // 1) окно DONKI: сдвиг подбирается так, чтобы буря попала в разрешённые солы
+  const win = DONKI_WINDOWS[Math.floor(rng() * DONKI_WINDOWS.length)];
+  const dayIdx = d => Math.round((Date.parse(d + 'T00:00:00Z') - Date.parse(win.start + 'T00:00:00Z')) / 86400000);
+  const stormLen = c.STORM_MULT_BY_DAY.length, offsets = [];
+  for (let o = 0; o <= win.days - N; o++) {
+    const seps = win.events.filter(e => e.type === 'SEP').map(e => dayIdx(e.date) - o + 1).filter(sol => sol >= 1 && sol <= N);
+    if (seps.length && seps.every(sol => sol >= c.STORM_MIN_SOL && sol <= c.STORM_MAX_SOL)) offsets.push(o);
+  }
+  const off = offsets.length ? offsets[Math.floor(rng() * offsets.length)] : 0;
+  for (const e of win.events) {
+    const sol = dayIdx(e.date) - off + 1;
+    if (sol < 1 || sol > N) continue;
+    days[sol - 1].real.push({ type: e.type, date: e.date, label: e.label, seenAt: e.seenAt, source: win.source, verified: win.verified });
+    if (e.type === 'SEP') for (let k = 0; k < stormLen && sol + k <= N; k++) {
+      const d = days[sol - 1 + k];
+      if (!d.storm) { d.storm = { day: k, date: e.date, label: e.label, verified: win.verified }; d.kind = 'trouble'; d.eventId = 'solar_storm'; }
+    }
+  }
+  // 2) погода и пылевая буря
+  for (const d of days) if (d.sol > c.CLEAR_UNTIL_SOL) d.weather = rng() < c.HAZY_CHANCE ? 'hazy' : 'clear';
+  const dustLen = ri(c.DUST_LEN_MIN, c.DUST_LEN_MAX);
+  let starts = [];
+  for (let sol = c.DUST_START_MIN; sol <= c.DUST_START_MAX; sol++) if (sol < N && !days[sol - 1].eventId) starts.push(sol);
+  if (!starts.length) for (let sol = c.FIRST_CHANCE_SOL + 1; sol < N; sol++) if (!days[sol - 1].eventId) starts.push(sol);
+  const dustPick = rng();
+  if (starts.length) {
+    const st = starts[Math.floor(dustPick * starts.length)];
+    setEv(st, 'trouble', 'dust_storm');
+    for (let k = 0; k < dustLen && st + k <= N; k++) days[st - 1 + k].weather = 'dust';
+  }
+  // 3) обучающие солы и фиксированные слоты
+  days[0].kind = 'intro';
+  setEv(c.TUTORIAL_TROUBLE_SOL, 'trouble', c.TUTORIAL_TROUBLE);
+  if (!days[2].eventId) days[2].kind = 'intro';
+  const chances = shuffle(c.CHANCE_POOL), troubles = shuffle(c.TROUBLE_POOL);
+  const fi = chances.findIndex(x => x !== 'clean_wind');
+  setEv(c.FIRST_CHANCE_SOL, 'chance', chances.splice(fi, 1)[0]);
+  if (!days[N - 1].eventId) days[N - 1].kind = 'ship';
+  // 4) остальные солы: поломки, шансы, тихие
+  const free = days.filter(d => d.sol > c.FIRST_CHANCE_SOL && d.sol < N && !d.eventId && d.kind === 'quiet').map(d => d.sol);
+  let kinds = [];
+  for (let i = 0; i < c.RANDOM_TROUBLES; i++) kinds.push('trouble');
+  for (let i = 0; i < c.CHANCES_TOTAL - 1; i++) kinds.push('chance');
+  while (kinds.length > free.length) kinds.pop();
+  while (kinds.length < free.length) kinds.push('quiet');
+  kinds = shuffle(kinds);
+  free.forEach((sol, i) => {
+    if (kinds[i] === 'trouble') setEv(sol, 'trouble', troubles.shift());
+    else if (kinds[i] === 'chance') setEv(sol, 'chance', chances.shift());
+  });
+  return days;
+}
+
+// --- запросы к состоянию ---
+function dayOf(s, sol) { return s.schedule[(sol === undefined ? s.sol : sol) - 1] || null; }
+function crewById(s, id) { return s.crew.find(p => p.id === id) || null; }
+function cardDef(id) { return CARDS.find(k => k.id === id); }
+function isUnlocked(s, sys) { return s.sol >= cfg(s.mode).SYSTEMS[sys].unlockSol; }
+function isBlackout(s, sol) { return cfg(s.mode).BLACKOUT_SOLS.includes(sol === undefined ? s.sol : sol); }
+function stormOn(s, sol) { const d = dayOf(s, sol); if (!d || !d.storm) return null; return { mult: cfg(s.mode).STORM_MULT_BY_DAY[d.storm.day] || 1, day: d.storm.day, date: d.storm.date, label: d.storm.label }; }
+function badgeOf(c, dose) { return dose >= c.BADGE_RED_MSV ? 'red' : dose >= c.BADGE_AMBER_MSV ? 'amber' : 'green'; }
+function problemNeed(c, p) { return Math.max(c.MIN_REPAIR_WORK, c.PROBLEMS[p.type].work + (p.severity - 1) * c.WORK_PER_SEVERITY - p.advice); }
+function problemEffect(c, p) {
+  const d = c.PROBLEMS[p.type];
+  if (d.airLeak) return 'air & water −' + d.airLeak * p.severity;
+  if (d.growthFactor) return 'crops grow at x' + d.growthFactor[p.severity - 1];
+  if (d.blocksRadio) return 'no radio';
+  if (d.cellsLost) return '−' + plural(d.cellsLost * p.severity, 'cell');
+  return '';
+}
+function radioBlocked(s) { const c = cfg(s.mode); return s.problems.some(p => c.PROBLEMS[p.type].blocksRadio); }
+function currentEvent(s) {
+  const d = dayOf(s);
+  if (!d || !d.eventId || s.today.skipEvent) return null;
+  if (d.kind === 'trouble') return { kind: 'trouble', id: d.eventId, def: TROUBLES[d.eventId] };
+  if (d.kind === 'chance') return { kind: 'chance', id: d.eventId, def: CHANCES[d.eventId] };
+  return null;
+}
+function cellsAvailable(s) {
+  const c = cfg(s.mode), ch = s.today.choice;
+  return s.supply + (ch && ch.id === 'use_now' ? c.WIND_BONUS_CELLS : 0);
+}
+function planTotal(plan) { return SYS_KEYS.reduce((a, k) => a + (plan.cells[k] || 0), 0); }
+function jobAllowed(s, p, j) {
+  const c = cfg(s.mode);
+  if (p.medbay > 0) return { ok: false, why: 'in the medbay' };
+  if (s.sol < c.JOB_UNLOCK_SOL) return { ok: j === 'rest', why: 'jobs open on sol ' + c.JOB_UNLOCK_SOL };
+  if (j === 'outside' && p.grounded) return { ok: false, why: 'red badge: stays inside' };
+  if (j === 'lab' && !isUnlocked(s, 'lab')) return { ok: false, why: 'lab opens on sol ' + c.SYSTEMS.lab.unlockSol };
+  return { ok: true, why: '' };
+}
+function sanitizePlan(s, plan) {
+  const c = cfg(s.mode), cells = {}, jobs = {};
+  for (const k of SYS_KEYS) {
+    let v = Math.floor(Number(plan.cells && plan.cells[k]) || 0);
+    v = isUnlocked(s, k) ? clamp(v, 0, c.SYSTEMS[k].max) : 0;
+    if (k === 'radio' && isBlackout(s)) v = 0;
+    cells[k] = v;
+  }
+  let total = SYS_KEYS.reduce((a, k) => a + cells[k], 0);
+  const avail = cellsAvailable(s);
+  // без бури щит бесполезен, поэтому он обрезается первым
+  const order = stormOn(s) ? c.TRIM_ORDER : ['shield'].concat(c.TRIM_ORDER.filter(k => k !== 'shield'));
+  for (const k of order) while (total > avail && cells[k] > 0) { cells[k]--; total--; }
+  for (const p of s.crew) {
+    let j = plan.jobs && plan.jobs[p.id];
+    if (!JOB_KEYS.includes(j) || !jobAllowed(s, p, j).ok) j = 'rest';
+    jobs[p.id] = j;
+  }
+  return { cells, jobs };
+}
+// Ячейки с учётом события (перегоревший предохранитель).
+function effectiveCells(s) {
+  const cells = Object.assign({}, s.plan.cells), ch = s.today.choice;
+  if (ch && s.today.revealed) {
+    if (ch.id === 'dark_greenhouse') cells.greenhouse = 0;
+    if (ch.id === 'dark_labradio') { cells.lab = 0; cells.radio = 0; }
+  }
+  return cells;
+}
+// Работы с учётом медотсека и выбора в событии.
+function effectiveJobs(s) {
+  const c = cfg(s.mode), out = {}, ev = currentEvent(s), ch = s.today.choice;
+  for (const p of s.crew) {
+    let j = s.plan.jobs[p.id] || 'rest';
+    if (s.sol < c.JOB_UNLOCK_SOL) j = 'rest';
+    if (j === 'outside' && p.grounded) j = 'rest';
+    if (p.medbay > 0) j = 'medbay';
+    out[p.id] = j;
+  }
+  if (ev && ch && s.today.revealed) {
+    if (ch.job) for (const id of ch.crew) if (out[id] !== 'medbay') out[id] = ch.job;
+    if (ev.id === 'solar_storm') {
+      if (ch.id === 'shelter_all') for (const p of s.crew) if (out[p.id] !== 'medbay') out[p.id] = 'shelter';
+      if (ch.id === 'indoors') for (const p of s.crew) if (out[p.id] === 'outside') out[p.id] = 'rest';
+    }
+    if (ev.id === 'sick_crew' && s.today.sickId) {
+      if (ch.id === 'medbay_now') out[s.today.sickId] = 'medbay';
+      if (ch.id === 'bed_rest') out[s.today.sickId] = 'rest';
+    }
+    if (ch.id === 'scan') { const sci = s.crew.find(p => p.role === 'scientist'); if (sci && out[sci.id] !== 'medbay') out[sci.id] = 'scan'; }
+  }
+  return out;
+}
+// Доза за сол: { d: всего, extra: сверх обычного из-за бури }.
+function doseFor(c, storm, job, shieldCells) {
+  const base = c.DOSE_INDOOR_PER_SOL, out = job === 'outside';
+  if (!storm) return { d: base + (out ? c.DOSE_OUTSIDE_TRIP : 0), extra: 0 };
+  if (out) { const d = (base + c.DOSE_OUTSIDE_TRIP) * storm.mult; return { d, extra: d - base - c.DOSE_OUTSIDE_TRIP }; }
+  const gap = 1 - Math.min(1, shieldCells / c.SYSTEMS.shield.want);
+  const exposure = gap * (job === 'shelter' || job === 'medbay' ? c.SHELTER_EXPOSURE : 1);
+  const d = base * (1 + (storm.mult - 1) * exposure);
+  return { d, extra: d - base };
+}
+function workPower(c, p, kind) {
+  return c.JOB_OUTPUT[kind] * (c.SPECIALIST_OF[p.role] === kind ? c.SPECIALIST_MULT : 1) * (p.cond === 'tired' ? c.TIRED_EFFECT : 1) * (p.sick ? c.SICK_EFFECT : 1);
+}
+
+// --- мутирующие помощники (работают только с клоном внутри функций движка) ---
+function addProblem(s, type) {
+  const old = s.problems.find(p => p.type === type), c = cfg(s.mode);
+  if (old) { old.severity = Math.min(c.PROBLEMS[type].maxSeverity, old.severity + 1); return old; }
+  const p = { uid: ++s.uid, type, severity: 1, done: 0, age: 0, advice: 0 };
+  s.problems.push(p); return p;
+}
+function enterMedbay(s, p, steps, cause) {
+  p.medbay = steps; p.sick = false; p.sickRest = 0; p.heavyStreak = 0;
+  if (!p.medbayCause) p.medbayCause = cause;
+  s.plan.jobs[p.id] = 'rest';
+}
+function findCard(s, id, say, why) {
+  if (!id || s.cards.found.includes(id)) return false;
+  s.cards.found.push(id);
+  if (say) say('Card found: ' + cardDef(id).title, why);
+  return true;
+}
+function know(s, sol) { if (sol <= cfg(s.mode).MISSION_SOLS && !s.known.includes(sol)) s.known.push(sol); }
+function forecastFor(s, sol) {
+  const d = dayOf(s, sol), c = cfg(s.mode), st = stormOn(s, sol);
+  return { sol, weather: d.weather, cells: c.CELLS_BY_WEATHER[d.weather], storm: st ? st.mult : null };
+}
+function setSupply(s) {
+  const c = cfg(s.mode), d = dayOf(s);
+  let v = c.CELLS_BY_WEATHER[d.weather];
+  const notes = [d.weather + ' sky ' + v];
+  for (const p of s.problems) { const pd = c.PROBLEMS[p.type]; if (pd.cellsLost) { v -= pd.cellsLost * p.severity; notes.push(pd.name.toLowerCase() + ' −' + pd.cellsLost * p.severity); } }
+  if (s.panelBoost && s.sol <= s.panelBoost.until) { v += s.panelBoost.cells; notes.push('polished panels +' + s.panelBoost.cells); }
+  if (s.battery > 0) { v += s.battery; notes.push('battery +' + s.battery); s.battery = 0; }
+  s.supply = Math.max(0, v); s.supplyNotes = notes;
+}
+function deliverAnswer(s, m) {
+  const c = cfg(s.mode);
+  if (m.id === 'forecast') {
+    for (let k = 1; k <= c.RADIO_FORECAST_SOLS; k++) know(s, s.sol + k);
+    return 'Earth sent the space weather forecast. See it below.';
+  }
+  if (m.id === 'fix') {
+    const p = s.problems[0];
+    if (!p) return 'Earth says: "Your call, Captain."';
+    p.advice += 1;
+    return 'Earth sent a repair trick. ' + c.PROBLEMS[p.type].name + ' needs less work.';
+  }
+  if (m.id === 'doctors') {
+    findCard(s, 'bones');
+    const pat = s.crew.filter(p => p.medbay > 0).sort((a, b) => b.medbay - a.medbay)[0];
+    if (pat) {
+      pat.medbay = Math.max(0, pat.medbay - 1);
+      if (pat.medbay <= 0) { pat.cond = 'fine'; return 'The doctors helped. ' + pat.name + ' leaves the medbay today.'; }
+      return 'The doctors helped. ' + pat.name + ' heals one sol sooner.';
+    }
+    const ill = s.crew.find(p => p.sick);
+    if (ill) { ill.sickRest += 1; return 'The doctors helped. ' + ill.name + ' needs less bed rest.'; }
+    return 'Earth says: "Your call, Captain."';
+  }
+  return 'Earth got your science report. Thank you!';
+}
+
+// --- начало нового сола (утро) ---
+function nextSol(s) {
+  const c = cfg(s.mode), prev = s.sol >= 1 ? dayOf(s) : null, last = s.log[s.log.length - 1];
+  if (s.sol >= 1) go(s, PHASE.BRIEFING); else s.phase = PHASE.BRIEFING;
+  s.sol++;
+  const day = dayOf(s), M = { lines: [], notes: [], answers: [], unlocked: [], words: [] };
+  if (s.sol === 1) {
+    M.lines.push('Landing done. The station is running.');
+    M.lines.push('The ship home lands on sol ' + c.MISSION_SOLS + '.');
+  } else {
+    M.lines.push(last && last.harvests ? 'Harvest came in. New crop is at ' + fmt(s.crop) + ' of ' + c.CROP_STEPS_TO_HARVEST + ' steps.' : 'Greenhouse: crop is at ' + fmt(s.crop) + ' of ' + c.CROP_STEPS_TO_HARVEST + ' steps.');
+    M.lines.push(s.problems.length ? 'Open trouble: ' + s.problems.map(p => c.PROBLEMS[p.type].name).join(', ') + '.' : 'Hull is holding. Nothing is broken.');
+    const med = s.crew.filter(p => p.medbay > 0);
+    M.lines.push(med.length ? 'In the medbay: ' + med.map(p => p.name).join(', ') + '.' : 'Nobody is in the medbay.');
+  }
+  if (prev && prev.weather === 'dust' && day.weather !== 'dust') {
+    if (!s.flags.panelsCovered) { addProblem(s, 'dusty_panels'); M.notes.push('Dust storm is over. Panels are dusty: fewer cells.'); }
+    else M.notes.push('Dust storm is over. The panels stayed clean.');
+    s.flags.panelsCovered = false;
+  }
+  // ответ Земли приходит утром, если связь есть
+  if (s.radio.queue.length) {
+    if (isBlackout(s)) M.answers.push('No word from Earth. The Sun is in the way.');
+    else if (radioBlocked(s)) M.answers.push('No word from Earth. The antenna is off.');
+    else { for (const m of s.radio.queue) M.answers.push(deliverAnswer(s, m)); s.radio.queue = []; }
+  }
+  for (let k = 1; k <= c.AUTO_FORECAST_SOLS; k++) know(s, s.sol + k);
+  for (const k of SYS_KEYS) if (c.SYSTEMS[k].unlockSol === s.sol && s.sol > 1) M.unlocked.push(c.SYSTEMS[k].name);
+  if (s.sol === c.JOB_UNLOCK_SOL) M.unlocked.push('Crew jobs');
+  const word = k => { if (!s.seenWords.includes(k)) { s.seenWords.push(k); M.words.push(WORDS[k]); } };
+  if (s.sol === 1) { word('sol'); word('cell'); }
+  if (s.sol === c.SYSTEMS.shield.unlockSol) word('msv');
+  if (day.real.some(e => e.type === 'FLR')) word('flare');
+  if (day.storm) word('sep');
+  if (isBlackout(s)) word('conj');
+  setSupply(s);
+  s.today = { revealed: false, choice: null, sickId: null, skipEvent: false, before: null };
+  // вчерашний план — стартовая точка сегодняшнего
+  if (s.flags.prefill) {
+    const pr = s.problems.find(p => p.type === s.flags.prefill);
+    if (pr) {
+      const job = c.PROBLEMS[pr.type].where === 'outside' ? 'outside' : 'fix';
+      const pool = s.crew.filter(p => jobAllowed(s, p, job).ok && !p.sick && p.cond !== 'tired');
+      const who = pool.find(p => p.role === 'engineer') || pool[0];
+      if (who) { s.plan.jobs[who.id] = job; M.notes.push(who.name + ' is set to fix the ' + c.PROBLEMS[pr.type].name.toLowerCase() + ' today.'); }
+    }
+    s.flags.prefill = null;
+  }
+  s.plan = sanitizePlan(s, s.plan);
+  M.lines.forEach(line15); M.notes.forEach(line15); M.answers.forEach(line15);
+  s.morning = M;
+  return s;
+}
+
+// --- публичный API движка ---
+function createMission(name, mode) {
+  mode = mode === 'commander' ? 'commander' : 'cadet';
+  const seed = normSeed(name), c = cfg(mode);
+  const s = {
+    v: 1, name: prettyName(name), seed, mode, sol: 0, phase: PHASE.BRIEFING,
+    air: c.AIR_START, food: c.FOOD_START, crop: 0, samples: 0, labWork: 0, science: 0,
+    crew: CREW.map(d => ({ id: d.id, name: d.name, role: d.role, cond: 'fine', sick: false, sickRest: 0, medbay: 0, medbaySols: 0, medbayCause: '', dose: 0, stormExtra: 0, trips: 0, heavyStreak: 0, grounded: false })),
+    problems: [], uid: 0, schedule: buildSchedule(seed),
+    supply: 0, supplyNotes: [], battery: 0, panelBoost: null,
+    plan: { cells: { life: c.SYSTEMS.life.want, shield: 0, greenhouse: c.SYSTEMS.greenhouse.want, radio: 0, lab: 0 }, jobs: {} },
+    today: { revealed: false, choice: null, sickId: null, skipEvent: false, before: null },
+    radio: { queue: [], sent: 0 }, known: [], cards: { found: [], sent: [] },
+    morning: null, lastResults: [], log: [], seenWords: [],
+    flags: { panelsCovered: false, prefill: null },
+    counters: { airZero: 0, foodZero: 0, harvests: 0, medbaySols: 0 }, over: null,
+  };
+  for (const p of s.crew) s.plan.jobs[p.id] = 'rest';
+  return nextSol(s);
+}
+function getMorning(s) {
+  const st = stormOn(s);
+  return {
+    sol: s.sol, weather: dayOf(s).weather, cells: s.supply, cellNotes: s.supplyNotes, storm: st, real: dayOf(s).real, blackout: isBlackout(s),
+    lines: s.morning.lines, notes: s.morning.notes, answers: s.morning.answers, unlocked: s.morning.unlocked, words: s.morning.words,
+    forecast: s.known.filter(n => n > s.sol).sort((a, b) => a - b).map(n => forecastFor(s, n)),
+  };
+}
+function startPlanning(state) { if (state.phase !== PHASE.BRIEFING) return state; return go(clone(state), PHASE.PLAN); }
+function applyPlan(state, plan) {
+  if (state.phase !== PHASE.PLAN) return state;
+  const s = clone(state);
+  s.plan = sanitizePlan(s, plan);
+  const ch = s.today.choice;
+  if (ch) { // выбор события мог стать недействительным (например, скан без питания лаборатории)
+    const def = eventChoices(s).find(x => x.id === ch.id);
+    if (!def || !def.enabled) { s.today.choice = null; s.plan = sanitizePlan(s, s.plan); }
+  }
+  return s;
+}
+// Событие открывается после первого подтверждения плана.
+function revealEvent(s) {
+  if (s.today.revealed) return;
+  s.today.revealed = true;
+  const ev = currentEvent(s);
+  if (!ev) return;
+  if (ev.kind === 'trouble' && ev.def.problem) addProblem(s, ev.def.problem);
+  if (ev.id === 'sick_crew') {
+    const n = s.crew.length, start = dayOf(s).sickIdx;
+    for (let k = 0; k < n; k++) { const p = s.crew[(start + k) % n]; if (p.medbay <= 0 && !p.sick) { s.today.sickId = p.id; break; } }
+    if (!s.today.sickId) s.today.skipEvent = true;
+  }
+  if (ev.id === 'clean_wind') s.problems = s.problems.filter(p => p.type !== 'dusty_panels');
+}
+function confirmPlan(state) {
+  if (state.phase !== PHASE.PLAN) return state;
+  const s = clone(state);
+  revealEvent(s);
+  if (currentEvent(s)) return go(s, PHASE.EVENT);
+  return playSol(s).state;
+}
+function backToPlan(state) { if (state.phase !== PHASE.EVENT) return state; return go(clone(state), PHASE.PLAN); }
+function clearChoice(state) { const s = clone(state); s.today.choice = null; s.plan = sanitizePlan(s, s.plan); return s; }
+
+// Варианты выбора в событии: цена «+» и «−», нужен ли экипаж.
+function eventChoices(s) {
+  const c = cfg(s.mode), ev = currentEvent(s), out = [];
+  if (!ev || !s.today.revealed) return out;
+  const free = s.crew.filter(p => p.medbay <= 0), canOut = free.filter(p => !p.grounded);
+  const add = (id, label, plus, minus, extra) => out.push(Object.assign({ id, label, plus, minus, pick: null, enabled: true, why: '', dose: null }, extra || {}));
+  const outPick = (task, max) => ({ pick: { job: 'outside', task, min: 1, max }, enabled: canOut.length > 0, why: 'Nobody can go outside' });
+  if (ev.kind === 'trouble' && ev.def.problem) {
+    const pr = s.problems.find(p => p.type === ev.def.problem), pd = c.PROBLEMS[ev.def.problem], eff = pr ? problemEffect(c, pr) : '';
+    if (pd.where === 'outside') add('fix_now', 'Send crew outside now', 'Fixed today with enough hands', 'They get extra dose and drop their jobs', outPick('repair', 2));
+    else add('fix_now', 'Fix it now', 'Fixed today with enough hands', 'They drop today\'s jobs', { pick: { job: 'fix', task: 'repair', min: 1, max: 2 }, enabled: free.length > 0, why: 'Nobody is free' });
+    add('tomorrow', 'Fix it tomorrow', 'Today\'s plan stays. A fixer is set for tomorrow', 'Tonight: ' + eff + '. It may grow.');
+    add('leave', 'Leave it', 'Costs nothing today', 'Every sol: ' + eff + '. It grows worse.');
+  } else if (ev.id === 'solar_storm') {
+    const st = stormOn(s), sh = effectiveCells(s).shield, anyOut = s.crew.some(p => p.medbay <= 0 && !p.grounded && s.plan.jobs[p.id] === 'outside');
+    add('shelter_all', 'Everyone into the shelter', 'Less dose if the shield is weak', 'Nobody works today', { dose: doseFor(c, st, 'shelter', sh).d });
+    add('indoors', 'Keep working indoors', 'Jobs go on inside', anyOut ? 'Outside trips are called off' : 'Dose depends on shield power', { dose: doseFor(c, st, 'rest', sh).d });
+    if (anyOut) add('as_planned', 'Stick to the plan', 'Outside trips go ahead', 'Full storm dose outside', { dose: doseFor(c, st, 'outside', sh).d });
+  } else if (ev.id === 'sick_crew') {
+    const p = crewById(s, s.today.sickId);
+    add('medbay_now', p.name + ' goes to the medbay', 'Healed in ' + c.ILLNESS_MEDBAY_STEPS + ' sols, sooner with care', 'Out of work. No third star');
+    add('bed_rest', p.name + ' rests in the bunk', 'No medbay if the rest goes on', 'Needs ' + c.SICK_REST_SOLS_TO_CURE + ' rest sols in a row');
+    add('keep_working', p.name + ' keeps working', 'Today\'s job gets done at half power', 'Medbay tonight, for ' + c.SICK_WORK_MEDBAY_STEPS + ' sols');
+  } else if (ev.id === 'power_fault') {
+    add('dark_greenhouse', 'Greenhouse goes dark today', 'Lab and radio keep power', 'Crops wait. ' + plural(s.plan.cells.greenhouse, 'cell') + ' lost');
+    add('dark_labradio', 'Lab and radio go dark today', 'Crops keep growing', 'No science, no message. ' + plural(s.plan.cells.lab + s.plan.cells.radio, 'cell') + ' lost');
+    add('rewire', 'Rewire it now', 'Nothing goes dark', 'One crew member drops their job', { pick: { job: 'rewire', task: 'rewire', min: 1, max: 1 }, enabled: free.length > 0, why: 'Nobody is free' });
+  } else if (ev.id === 'dust_storm') {
+    add('cover', 'Send someone to tilt the panels', 'Panels stay clean after the storm', 'Extra dose. Job dropped', outPick('cover', 1));
+    add('wait', 'Wait it out', 'Crew stays inside', 'Dusty panels later: fewer cells');
+  } else if (ev.id === 'clean_wind') {
+    add('use_now', 'Use the extra power today', '+' + c.WIND_BONUS_CELLS + ' cells today', 'Gone at sunset');
+    add('polish', 'Send someone to polish the panels', '+' + c.WIND_POLISH_CELLS + ' cell for ' + c.WIND_POLISH_SOLS + ' sols', 'Extra dose. Job dropped', outPick('polish', 1));
+    add('let_go', 'Let it go', 'Costs nothing', 'The panels get dusty again');
+  } else if (ev.kind === 'chance') {
+    const sci = s.crew.find(p => p.role === 'scientist'), want = c.SYSTEMS.lab.want;
+    const labOk = isUnlocked(s, 'lab') && s.plan.cells.lab >= want, sciOk = !!sci && sci.medbay <= 0;
+    add('outside', 'Go outside for it', 'Discovery card and a sample', 'Extra dose. Job dropped', outPick('chance', 1));
+    add('scan', 'Scan it from the lab', 'Discovery card, nobody goes outside', 'Needs ' + want + ' lab cells and ' + (sci ? sci.name : 'the scientist') + '\'s day',
+      { enabled: labOk && sciOk, why: !labOk ? 'The lab has no power. Go back to the plan.' : 'The scientist is in the medbay' });
+    add('let_go', 'Let it go', 'Costs nothing', 'The chance is gone by morning');
+  }
+  return out;
+}
+function resolveEvent(state, choiceId, crewIds) {
+  if (state.phase !== PHASE.EVENT) return state;
+  const s = clone(state), def = eventChoices(s).find(x => x.id === choiceId);
+  if (!def || !def.enabled) return s;
+  const crew = [];
+  if (def.pick) {
+    for (const id of crewIds || []) {
+      const p = crewById(s, id);
+      if (p && !crew.includes(id) && p.medbay <= 0 && !(def.pick.job === 'outside' && p.grounded) && crew.length < def.pick.max) crew.push(id);
+    }
+    if (crew.length < def.pick.min) return s;
+  }
+  s.today.choice = { id: choiceId, crew, job: def.pick ? def.pick.job : null, task: def.pick ? def.pick.task : null, label: def.label };
+  s.plan = sanitizePlan(s, s.plan);
+  return s;
+}
+
+// --- главный расчёт сола ---
+function playSol(state) {
+  if (state.phase !== PHASE.PLAN && state.phase !== PHASE.EVENT) return { state, results: [] };
+  const s = clone(state), c = cfg(s.mode), day = dayOf(s), R = [];
+  const say = (t, why) => R.push({ t, why: why || '' });
+  revealEvent(s);
+  const ev = currentEvent(s);
+  if (ev && !s.today.choice) { // бот/превью не выбрали: берём последний «ничего не делать»
+    const l = eventChoices(s).filter(x => x.enabled && !x.pick), d = l[l.length - 1];
+    s.today.choice = { id: d.id, crew: [], job: null, task: null, label: d.label };
+  }
+  const ch = ev ? s.today.choice : null;
+  s.plan = sanitizePlan(s, s.plan);
+  s.today.before = { air: s.air, food: s.food, crop: s.crop, science: s.science };
+  const jobs = effectiveJobs(s), cells = effectiveCells(s), storm = stormOn(s);
+  const rec = { sol: s.sol, supply: cellsAvailable(s), cells, jobs, air: [], harvests: 0, choice: ch ? ev.id + ':' + ch.id : null };
+  const names = list => list.map(p => p.name).join(' and ');
+  const withJob = j => s.crew.filter(p => jobs[p.id] === j);
+  const tank = (key, label, d, why, causeKey) => {
+    if (!d) return;
+    const b = s[key]; s[key] = clamp(s[key] + d, 0, c.TANK_MAX);
+    const real = s[key] - b;
+    if (key === 'air') rec.air.push({ d: real, key: causeKey || why });
+    if (real !== 0) say(label + ' ' + signed(real) + (real !== d ? (d > 0 ? ' (tank full)' : ' (tank empty)') : ''), why);
+    else say(label + (d > 0 ? ' tank is full' : ' tank is empty'), why);
+  };
+  const air = (d, why, key) => tank('air', 'Air & water', d, why, key);
+  const food = (d, why) => tank('food', 'Food', d, why);
+
+  // 0) событие: болезнь
+  if (ev && ev.id === 'sick_crew') {
+    const p = crewById(s, s.today.sickId);
+    if (ch.id === 'medbay_now') { enterMedbay(s, p, c.ILLNESS_MEDBAY_STEPS, 'feeling ill'); say(p.name + ' went to the medbay', 'ill, your choice'); }
+    else { p.sick = true; p.sickRest = 0; }
+  }
+  // 0) событие: предохранитель
+  if (ev && ev.id === 'power_fault') {
+    if (ch.id === 'dark_greenhouse') say('Greenhouse dark today', 'blown fuse, your choice');
+    else if (ch.id === 'dark_labradio') say('Lab and radio dark today', 'blown fuse, your choice');
+    else say('Fuse rewired: nothing went dark', names(withJob('rewire')) + ' spent the day on it');
+  }
+
+  // 1) ремонт внутри и снаружи; свободные «наружные» собирают образцы
+  const repair = (where, workers) => {
+    const idle = [];
+    workers.sort((a, b) => workPower(c, b, 'fix') - workPower(c, a, 'fix'));
+    for (const p of workers) {
+      let w = workPower(c, p, 'fix'), did = false;
+      for (const pr of s.problems) {
+        if (w <= 1e-9) break;
+        if (pr.fixed || c.PROBLEMS[pr.type].where !== where) continue;
+        const use = Math.min(w, problemNeed(c, pr) - pr.done);
+        pr.done += use; w -= use; did = true;
+        pr.by = pr.by || []; if (!pr.by.includes(p.name)) pr.by.push(p.name);
+        if (pr.done >= problemNeed(c, pr) - 1e-9) pr.fixed = true;
+      }
+      if (!did) idle.push(p);
+    }
+    return idle;
+  };
+  const task = ch ? ch.task : null, picked = ch ? ch.crew : [];
+  const special = id => picked.includes(id) && (task === 'chance' || task === 'cover' || task === 'polish');
+  // кому нечего чинить — простаивает: это не тяжёлая работа и не отдых
+  for (const p of repair('inside', withJob('fix'))) { say(p.name + ' had nothing to fix', 'nothing is broken inside'); jobs[p.id] = 'idle'; }
+  for (const p of repair('outside', withJob('outside').filter(p => !special(p.id)))) {
+    const n = workPower(c, p, 'outside'); s.samples = r3(s.samples + n);
+    say('Samples ' + signed(n), p.name + ' went outside');
+  }
+  for (const pr of s.problems) {
+    const pd = c.PROBLEMS[pr.type];
+    if (pr.fixed) { say(pd.name + ' fixed!', 'repair by ' + pr.by.join(' and ')); if (pd.airOnFix) air(pd.airOnFix, pd.name.toLowerCase() + ' works again', 'fix'); }
+    else if (pr.by && pr.by.length) say(pd.name + ': repair ' + fmt(pr.done) + ' of ' + fmt(problemNeed(c, pr)), pr.by.join(' and ') + ' worked on it');
+    delete pr.by;
+  }
+  s.problems = s.problems.filter(pr => !pr.fixed);
+
+  // 2) теплица
+  const lamp = s.problems.find(p => p.type === 'lamp_fault'), lf = lamp ? c.PROBLEMS.lamp_fault.growthFactor[lamp.severity - 1] : 1;
+  let steps = 0;
+  if (cells.greenhouse > 0) {
+    const st = cells.greenhouse * c.STEPS_PER_GREENHOUSE_CELL * lf; steps += st;
+    say('Crop +' + plural(st, 'step'), plural(cells.greenhouse, 'greenhouse cell') + (lamp ? ', lamps are faulty' : ''));
+  } else say('Crops wait', 'greenhouse dark');
+  for (const p of withJob('grow')) {
+    if (cells.greenhouse > 0 || !c.GROW_NEEDS_LIGHT) { const st = workPower(c, p, 'grow'); steps += st; say('Crop +' + plural(st, 'step'), p.name + ' tended the plants'); }
+    else say(p.name + ' could not grow', 'greenhouse dark');
+  }
+  s.crop = r3(s.crop + steps);
+  while (s.crop >= c.CROP_STEPS_TO_HARVEST - 1e-9) {
+    s.crop = Math.max(0, r3(s.crop - c.CROP_STEPS_TO_HARVEST)); rec.harvests++; s.counters.harvests++;
+    food(c.HARVEST_FOOD, 'harvest: crop reached ' + c.CROP_STEPS_TO_HARVEST + ' steps');
+  }
+
+  // 3) лаборатория
+  const labOn = isUnlocked(s, 'lab') && cells.lab >= c.SYSTEMS.lab.want;
+  for (const p of withJob('lab')) {
+    if (!labOn) { say(p.name + ': no lab work', 'lab dark'); continue; }
+    if (s.samples < 1) { say(p.name + ': no lab work', 'no samples to study'); continue; }
+    s.labWork = r3(s.labWork + workPower(c, p, 'lab'));
+    let made = false;
+    while (s.labWork >= c.LAB_WORK_PER_SAMPLE - 1e-9 && s.samples >= 1) {
+      s.labWork = Math.max(0, r3(s.labWork - c.LAB_WORK_PER_SAMPLE)); s.samples = r3(s.samples - 1); made = true;
+      const next = CARDS.find(k => k.kind === 'lab' && !s.cards.found.includes(k.id));
+      if (next) findCard(s, next.id, say, p.name + ' studied a sample');
+      else say('Sample studied: nothing new', 'all lab cards are found');
+    }
+    if (!made) say('Sample half studied', p.name + ' worked in the lab');
+  }
+  if (s.samples < 1) s.labWork = 0;
+
+  // 4) исход шанса и задачи снаружи
+  if (ev && ev.kind === 'chance' && ev.id !== 'clean_wind') {
+    if (ch.id === 'outside') {
+      const p = crewById(s, picked[0]);
+      findCard(s, ev.def.card, say, p.name + ' went outside for it');
+      s.samples = r3(s.samples + c.CHANCE_SAMPLES); say('Samples ' + signed(c.CHANCE_SAMPLES), p.name + ' brought one back');
+    } else if (ch.id === 'scan') {
+      if (labOn && withJob('scan').length) findCard(s, ev.def.card, say, names(withJob('scan')) + ' scanned it from the lab');
+      else say('Scan failed', 'lab dark');
+    } else say('Chance gone', 'you let it go');
+  }
+  if (ev && ev.id === 'clean_wind') {
+    if (ch.id === 'use_now') say('Cells +' + c.WIND_BONUS_CELLS + ' today', 'wind cleaned the panels');
+    else if (ch.id === 'polish') { s.panelBoost = { cells: c.WIND_POLISH_CELLS, until: s.sol + c.WIND_POLISH_SOLS }; say('Cells +' + c.WIND_POLISH_CELLS + ' for ' + c.WIND_POLISH_SOLS + ' sols', crewById(s, picked[0]).name + ' polished the panels'); }
+    else say('Chance gone', 'you let it go');
+  }
+  if (ev && ev.id === 'dust_storm') {
+    if (ch.id === 'cover') { s.flags.panelsCovered = true; say('Panels tilted against the dust', crewById(s, picked[0]).name + ' went outside'); }
+    else say('Panels left in the dust', 'you waited it out');
+  }
+
+  // 5) уход за больными: вся помощь идёт первому пациенту
+  const carers = withJob('care'), careFor = {};
+  if (carers.length) {
+    const pts = carers.reduce((a, p) => a + workPower(c, p, 'care'), 0);
+    const pat = s.crew.filter(p => jobs[p.id] === 'medbay').sort((a, b) => b.medbay - a.medbay)[0] || s.crew.find(p => p.sick && jobs[p.id] === 'rest');
+    if (pat) careFor[pat.id] = pts; else say(names(carers) + ' had nobody to care for', 'nobody is ill');
+  }
+
+  // 6) воздух и вода
+  const miss = c.SYSTEMS.life.want - cells.life;
+  if (miss > 0) air(-miss * c.AIR_LOSS_PER_MISSING_CELL, 'life support ' + plural(miss, 'cell') + ' short', 'life');
+  else if (miss < 0) air(-miss * c.AIR_GAIN_PER_EXTRA_CELL, 'extra life support cell', 'extra');
+  for (const pr of s.problems) { const pd = c.PROBLEMS[pr.type]; if (pd.airLeak) air(-pd.airLeak * pr.severity, pd.name.toLowerCase() + ' leaks', pr.type); }
+  // 7) еда
+  food(-c.FOOD_EATEN_PER_SOL, 'the crew ate');
+
+  // 8) радиация
+  if (storm) say('Solar storm: dose x' + storm.mult + ' without shield', cells.shield >= c.SYSTEMS.shield.want ? 'shield at full power: minimum dose inside' : 'shield has ' + cells.shield + ' of ' + c.SYSTEMS.shield.want + ' cells');
+  for (const p of s.crew) {
+    const j = jobs[p.id], r = doseFor(c, storm, j, cells.shield), b0 = badgeOf(c, p.dose);
+    p.dose = r3(p.dose + r.d); p.stormExtra = r3(p.stormExtra + r.extra);
+    if (j === 'outside') p.trips++;
+    const b1 = badgeOf(c, p.dose);
+    if (b1 !== b0) {
+      say(p.name + '\'s badge turned ' + b1, j === 'outside' ? 'trip outside' : r.extra > 0.01 ? 'storm with a weak shield' : 'dose adds up every sol');
+      if (b1 === 'red' && c.RED_BADGE_GROUNDS) { p.grounded = true; say(p.name + ' stays inside from now on', 'red badge'); }
+    }
+  }
+
+  // 9) состояния людей
+  for (const p of s.crew) {
+    const j = jobs[p.id];
+    if (j === 'medbay') {
+      p.medbaySols++; s.counters.medbaySols++;
+      p.medbay = r3(p.medbay - c.MEDBAY_HEAL_PER_SOL - (careFor[p.id] || 0));
+      if (p.medbay <= 1e-9) { p.medbay = 0; p.cond = 'fine'; p.sick = false; p.heavyStreak = 0; say(p.name + ' leaves the medbay', careFor[p.id] ? 'healed faster with care' : 'healed'); }
+      else say(p.name + ' stays in the medbay', plural(Math.ceil(p.medbay), 'more sol'));
+      continue;
+    }
+    if (p.sick) {
+      if (j === 'rest') {
+        p.sickRest = r3(p.sickRest + 1 + (careFor[p.id] || 0)); p.heavyStreak = 0;
+        if (p.sickRest >= c.SICK_REST_SOLS_TO_CURE - 1e-9) { p.sick = false; p.sickRest = 0; p.cond = 'fine'; say(p.name + ' is well again', careFor[p.id] ? 'bed rest and care' : 'bed rest'); }
+        else say(p.name + ' rests in the bunk', 'one more rest sol needed');
+      } else { enterMedbay(s, p, c.SICK_WORK_MEDBAY_STEPS, 'working while ill'); say(p.name + ' got worse: medbay', 'worked while ill'); }
+      continue;
+    }
+    if (c.HEAVY_JOBS.includes(j)) {
+      if (p.cond === 'tired' && c.TIRED_HEAVY_WORK_INJURES) {
+        enterMedbay(s, p, c.INJURY_MEDBAY_STEPS, j === 'outside' ? 'a trip outside while tired' : 'heavy work while tired');
+        say(p.name + ' got hurt: medbay', 'heavy work while tired');
+      } else {
+        p.heavyStreak++;
+        if (p.heavyStreak >= c.HEAVY_SOLS_TO_TIRED && p.cond !== 'tired') { p.cond = 'tired'; say(p.name + ' is tired', c.HEAVY_SOLS_TO_TIRED + ' heavy sols in a row'); }
+      }
+    } else {
+      p.heavyStreak = 0;
+      if (j === 'rest' && p.cond === 'tired') { p.cond = 'fine'; say(p.name + ' is rested', 'took a rest sol'); }
+    }
+  }
+
+  // 10) запущенные поломки растут
+  for (const pr of s.problems) {
+    const pd = c.PROBLEMS[pr.type]; pr.age++;
+    if (pd.growEvery > 0 && pr.age % pd.growEvery === 0 && pr.severity < pd.maxSeverity) { pr.severity++; say(pd.name + ' grew worse', 'left open for ' + plural(pr.age, 'sol')); }
+  }
+  if (ch && ch.id === 'tomorrow' && ev.def.problem) s.flags.prefill = ev.def.problem;
+
+  // 11) карточки-вехи
+  const next = dayOf(s, s.sol + 1);
+  if (rec.harvests > 0) findCard(s, 'space_radishes', say, 'first harvest');
+  if (day.storm && !(next && next.storm)) findCard(s, 'storm_survived', say, 'the solar storm passed');
+  if (day.weather === 'dust' && !(next && next.weather === 'dust')) findCard(s, 'dust_survived', say, 'the dust storm passed');
+  if (isBlackout(s) && !isBlackout(s, s.sol + 1)) findCard(s, 'conjunction', say, 'the radio blackout ended');
+
+  // 12) неиспользованные ячейки
+  const unused = rec.supply - planTotal(s.plan);
+  if (unused > 0) {
+    if (c.BATTERY_CAPACITY > 0) { s.battery = Math.min(c.BATTERY_CAPACITY, unused); say(plural(s.battery, 'cell') + ' saved in the battery', 'not shared out'); if (unused > s.battery) say(plural(unused - s.battery, 'cell') + ' lost at sunset', 'battery is full'); }
+    else say(plural(unused, 'cell') + ' lost at sunset', 'not shared out');
+  }
+
+  // 13) проверка поражения
+  s.counters.airZero = s.air <= 0 ? s.counters.airZero + 1 : 0;
+  s.counters.foodZero = s.food <= 0 ? s.counters.foodZero + 1 : 0;
+  if (s.counters.airZero >= c.ZERO_SOLS_TO_LOSE) s.over = { won: false, why: 'air' };
+  else if (s.counters.foodZero >= c.ZERO_SOLS_TO_LOSE) s.over = { won: false, why: 'food' };
+  else if (s.counters.airZero || s.counters.foodZero) say('Warning: a tank is empty', 'one more empty sol ends the mission');
+
+  s.log.push(rec); s.lastResults = R;
+  go(s, PHASE.RESULTS);
+  return { state: s, results: R };
+}
+// Превью «что будет вечером» — тот же движок на клоне; нераскрытое событие не подсматривается.
+function previewSol(state) {
+  const s = clone(state);
+  if (!s.today.revealed) { const d = s.schedule[s.sol - 1]; d.kind = 'quiet'; d.eventId = null; }
+  return playSol(s).state;
+}
+
+function radioCanSend(s) {
+  const c = cfg(s.mode), last = s.log[s.log.length - 1];
+  return isUnlocked(s, 'radio') && !isBlackout(s) && !radioBlocked(s) && !!last && last.sol === s.sol && last.cells.radio >= c.SYSTEMS.radio.want;
+}
+function radioOffReason(s) {
+  const c = cfg(s.mode), last = s.log[s.log.length - 1];
+  if (!isUnlocked(s, 'radio')) return 'The radio opens on sol ' + c.SYSTEMS.radio.unlockSol + '.';
+  if (isBlackout(s)) return 'Radio blackout: the Sun is between Mars and Earth.';
+  if (radioBlocked(s)) return 'No radio: the antenna is off.';
+  if (!last || last.cells.radio < c.SYSTEMS.radio.want) return 'No message tonight: the radio had no cell.';
+  return '';
+}
+function messageOptions(s) {
+  const c = cfg(s.mode), unsent = s.cards.found.filter(id => !s.cards.sent.includes(id));
+  const firstBonus = s.radio.sent === 0 && !s.cards.found.includes('first_call') ? c.SCIENCE_PER_CARD.milestone : 0;
+  const pts = unsent.reduce((a, id) => a + c.SCIENCE_PER_CARD[cardDef(id).kind], 0) + firstBonus;
+  const ill = s.crew.some(p => p.medbay > 0 || p.sick);
+  return [
+    { id: 'forecast', label: 'What will space weather be like?', plus: 'Forecast for ' + c.RADIO_FORECAST_SOLS + ' sols, at breakfast', minus: 'Uses tonight\'s message', enabled: true, why: '' },
+    { id: 'fix', label: 'How can we fix it faster?', plus: 'The open repair needs less work', minus: 'Uses tonight\'s message', enabled: s.problems.length > 0, why: 'Nothing is broken' },
+    { id: 'doctors', label: 'Ask the doctors', plus: 'A patient heals one sol sooner', minus: 'Uses tonight\'s message', enabled: ill, why: 'Nobody is ill' },
+    { id: 'science', label: 'Send our science report', plus: plural(unsent.length + (firstBonus ? 1 : 0), 'card') + ' sent: +' + pts + ' science', minus: 'No question tonight, no forecast', enabled: unsent.length > 0, why: 'No new cards to send' },
+  ];
+}
+function endOrNext(s) {
+  const c = cfg(s.mode);
+  if (s.sol >= c.MISSION_SOLS) { s.over = { won: true, why: 'ship' }; return go(s, PHASE.REPORT); }
+  return nextSol(s);
+}
+function proceed(state) { // results → radio | следующее утро | отчёт
+  if (state.phase !== PHASE.RESULTS) return state;
+  const s = clone(state);
+  if (s.over) return go(s, PHASE.REPORT);
+  if (radioCanSend(s)) return go(s, PHASE.RADIO);
+  return endOrNext(s);
+}
+function sendMessage(state, messageId) {
+  if (state.phase !== PHASE.RADIO) return state;
+  const s = clone(state), c = cfg(s.mode), opt = messageOptions(s).find(m => m.id === messageId);
+  if (opt && opt.enabled) {
+    if (s.radio.sent === 0) findCard(s, 'first_call');
+    s.radio.sent++;
+    if (messageId === 'science') {
+      const unsent = s.cards.found.filter(id => !s.cards.sent.includes(id));
+      for (const id of unsent) { s.cards.sent.push(id); s.science += c.SCIENCE_PER_CARD[cardDef(id).kind]; }
+    }
+    s.radio.queue.push({ id: messageId, sol: s.sol });
+  }
+  return endOrNext(s);
+}
+
+// --- итог миссии ---
+function matteredMost(s) {
+  const c = cfg(s.mode);
+  if (!s.over || s.over.won) return '';
+  if (s.over.why === 'food') {
+    const want = c.SYSTEMS.greenhouse.want; let best = null, run = null;
+    for (const r of s.log) {
+      if (r.cells.greenhouse < want) {
+        if (!run) run = { a: r.sol, b: r.sol, zero: true };
+        run.b = r.sol; if (r.cells.greenhouse > 0) run.zero = false;
+        if (!best || run.b - run.a > best.b - best.a) best = Object.assign({}, run);
+      } else run = null;
+    }
+    if (best) return 'The greenhouse had ' + (best.zero ? 'no' : 'too little') + ' power on sol' + (best.a === best.b ? ' ' + best.a : 's ' + best.a + '–' + best.b) + '.';
+    return 'Only ' + plural(s.counters.harvests, 'harvest') + ' came in. More hands in the greenhouse would help.';
+  }
+  const sums = {};
+  for (const r of s.log) for (const a of r.air) if (a.d < 0) { const k = sums[a.key] || (sums[a.key] = { lost: 0, sols: 0 }); k.lost -= a.d; k.sols++; }
+  const top = Object.keys(sums).sort((a, b) => sums[b].lost - sums[a].lost)[0];
+  if (!top) return 'Air & water ran out.';
+  if (top === 'life') return 'Life support was short of power on ' + plural(sums[top].sols, 'sol') + ' (−' + fmt(sums[top].lost) + ' air & water).';
+  return 'The ' + c.PROBLEMS[top].name.toLowerCase() + ' leaked for ' + plural(sums[top].sols, 'sol') + ' (−' + fmt(sums[top].lost) + ' air & water). Fix it early.';
+}
+function endMission(s) {
+  const c = cfg(s.mode), won = !!(s.over && s.over.won);
+  const badges = s.crew.map(p => badgeOf(c, p.dose));
+  const noMed = s.counters.medbaySols === 0, allGreen = badges.every(b => b === 'green');
+  const third = c.THIRD_STAR_RULE === 'medbay' ? noMed : c.THIRD_STAR_RULE === 'green' ? allGreen : noMed && allGreen;
+  const stars = [won, s.science >= c.SCIENCE_TARGET, won && third], hints = ['', '', ''];
+  if (!stars[0]) hints[0] = matteredMost(s);
+  if (!stars[1]) {
+    const unsent = s.cards.found.filter(id => !s.cards.sent.includes(id));
+    const pot = s.science + unsent.reduce((a, id) => a + c.SCIENCE_PER_CARD[cardDef(id).kind], 0);
+    hints[1] = pot >= c.SCIENCE_TARGET ? plural(unsent.length, 'card') + ' never went home. Send the science report.'
+      : 'Only ' + plural(s.cards.found.length, 'card') + ' found. Take chances and power the lab.';
+  }
+  if (!stars[2]) {
+    const m = s.crew.find(p => p.medbaySols > 0), i = badges.findIndex(b => b !== 'green');
+    if (!won) hints[2] = 'Reach sol ' + c.MISSION_SOLS + ' first.';
+    else if (m && c.THIRD_STAR_RULE !== 'green') hints[2] = m.name + ' spent ' + plural(m.medbaySols, 'sol') + ' in the medbay after ' + m.medbayCause + '.';
+    else if (i >= 0) hints[2] = s.crew[i].name + '\'s badge turned ' + badges[i] + ': ' + plural(s.crew[i].trips, 'trip') + ' outside' + (s.crew[i].stormExtra > 0.01 ? ' and storm dose.' : '.');
+  }
+  const real = [];
+  for (const d of s.schedule) if (d.sol <= s.sol) for (const e of d.real) real.push(Object.assign({ sol: d.sol }, e));
+  return {
+    won, why: s.over ? s.over.why : '', sol: s.sol, stars, hints, mattered: matteredMost(s),
+    doses: s.crew.map((p, i) => ({ name: p.name, role: p.role, dose: p.dose, badge: badges[i], trips: p.trips, medbaySols: p.medbaySols })),
+    science: s.science, target: c.SCIENCE_TARGET, found: s.cards.found.slice(), sent: s.cards.sent.slice(), real,
+  };
+}
+
+/* ============================== 4. BOT + SELF-TEST ============================== */
+function botPlan(s, style) {
+  const c = cfg(s.mode), day = dayOf(s), cells = { life: 0, shield: 0, greenhouse: 0, radio: 0, lab: 0 }, jobs = {};
+  let left = cellsAvailable(s);
+  const give = (k, n) => { if (!isUnlocked(s, k)) return; const g = Math.max(0, Math.min(n, left, c.SYSTEMS[k].max - cells[k])); cells[k] += g; left -= g; };
+  if (style === 'lazy') { give('shield', 3); give('lab', 2); give('radio', 1); for (const p of s.crew) jobs[p.id] = 'rest'; return { cells, jobs }; }
+  give('life', c.SYSTEMS.life.want);
+  if (day.storm) give('shield', c.SYSTEMS.shield.want);
+  give('greenhouse', s.food <= 5 ? 3 : 2);
+  if (!isBlackout(s) && !radioBlocked(s)) give('radio', 1);
+  if (left >= c.SYSTEMS.lab.want && s.sol >= c.SYSTEMS.lab.unlockSol) give('lab', c.SYSTEMS.lab.want);
+  give('greenhouse', 3);
+  if (s.air < c.TANK_MAX - 1) give('life', 1);
+  give('shield', 3);
+  const inside = s.problems.some(p => c.PROBLEMS[p.type].where === 'inside'), outside = s.problems.some(p => c.PROBLEMS[p.type].where === 'outside');
+  const ill = s.crew.some(p => p.medbay > 0 || p.sick);
+  for (const p of s.crew) {
+    let j = 'grow';
+    const fit = p.cond !== 'tired' && !p.sick, canOut = fit && !p.grounded && !day.storm;
+    const safeTrip = p.dose + c.DOSE_INDOOR_PER_SOL * (c.MISSION_SOLS - s.sol + 1) + c.DOSE_OUTSIDE_TRIP < c.BADGE_AMBER_MSV;
+    if (!fit) j = 'rest';
+    else if (p.role === 'engineer') j = inside ? 'fix' : outside && canOut ? 'outside' : 'grow';
+    else if (p.role === 'medic') j = ill ? 'care' : 'grow';
+    else if (p.role === 'scientist') j = cells.lab >= c.SYSTEMS.lab.want && s.samples >= 1 ? 'lab' : 'grow';
+    else if (p.role === 'pilot') j = canOut && safeTrip && p.heavyStreak < 1 && s.sol >= c.SYSTEMS.lab.unlockSol ? 'outside' : 'grow';
+    jobs[p.id] = j;
+  }
+  return { cells, jobs };
+}
+function botChoice(s, style) {
+  const c = cfg(s.mode), ev = currentEvent(s), list = eventChoices(s).filter(x => x.enabled);
+  const lastId = () => { const l = list.filter(x => !x.pick); return [l[l.length - 1].id, []]; };
+  if (style !== 'careful') return lastId();
+  const has = id => list.some(x => x.id === id);
+  const fit = s.crew.filter(p => p.medbay <= 0 && !p.sick && p.cond !== 'tired');
+  const fixers = fit.slice().sort((a, b) => workPower(c, b, 'fix') - workPower(c, a, 'fix'));
+  const safe = fit.filter(p => !p.grounded && p.dose + c.DOSE_INDOOR_PER_SOL * (c.MISSION_SOLS - s.sol + 1) + c.DOSE_OUTSIDE_TRIP < c.BADGE_AMBER_MSV).sort((a, b) => a.dose - b.dose);
+  if (ev.id === 'solar_storm') return ['indoors', []];
+  if (ev.id === 'sick_crew') return ['bed_rest', []];
+  if (ev.id === 'power_fault') return ['dark_labradio', []];
+  if (ev.id === 'dust_storm') return ['wait', []];
+  if (ev.id === 'clean_wind') return ['use_now', []];
+  if (ev.kind === 'chance') { if (has('scan')) return ['scan', []]; if (has('outside') && safe.length) return ['outside', [safe[0].id]]; return ['let_go', []]; }
+  if (has('fix_now')) {
+    const def = list.find(x => x.id === 'fix_now'), pool = def.pick.job === 'outside' ? fixers.filter(p => !p.grounded) : fixers;
+    if (pool.length) return ['fix_now', [pool[0].id]];
+    return ['tomorrow', []];
+  }
+  return lastId();
+}
+function botMessage(s, style) {
+  if (style !== 'careful') return null;
+  const c = cfg(s.mode), o = messageOptions(s), en = id => o.find(m => m.id === id).enabled;
+  const unsent = s.cards.found.filter(id => !s.cards.sent.includes(id)).length;
+  if (en('science') && (unsent >= 2 || s.sol >= c.MISSION_SOLS - 2)) return 'science';
+  if (en('doctors')) return 'doctors';
+  if (en('fix')) return 'fix';
+  return 'forecast';
+}
+function botStep(s, style) {
+  if (s.phase === PHASE.BRIEFING) return startPlanning(s);
+  if (s.phase === PHASE.PLAN) return confirmPlan(applyPlan(s, botPlan(s, style)));
+  if (s.phase === PHASE.EVENT) {
+    const pick = botChoice(s, style);
+    let t = resolveEvent(s, pick[0], pick[1]);
+    if (pick[0] === 'use_now') t = confirmPlan(applyPlan(backToPlan(t), botPlan(backToPlan(t), style)));
+    return playSol(t).state;
+  }
+  if (s.phase === PHASE.RESULTS) return proceed(s);
+  if (s.phase === PHASE.RADIO) return sendMessage(s, botMessage(s, style));
+  return s;
+}
+function runMission(seed, mode, style, hook) {
+  let s = createMission(seed, mode), guard = 0;
+  if (hook) hook(s);
+  while (s.phase !== PHASE.REPORT && guard++ < 400) { s = botStep(s, style || 'careful'); if (hook) hook(s); }
+  return s;
+}
+function balanceReport(n) {
+  n = n || 40; const out = {};
+  for (const mode of ['cadet', 'commander']) {
+    const a = { missions: n, star1: 0, star2: 0, star3: 0, avgScience: 0, avgMinAir: 0, avgMinFood: 0, avgMaxDose: 0 };
+    for (let i = 0; i < n; i++) {
+      let minAir = 99, minFood = 99;
+      const s = runMission('balance ' + i, mode, 'careful', t => { minAir = Math.min(minAir, t.air); minFood = Math.min(minFood, t.food); });
+      const r = endMission(s);
+      a.star1 += r.stars[0] ? 1 : 0; a.star2 += r.stars[1] ? 1 : 0; a.star3 += r.stars[2] ? 1 : 0;
+      a.avgScience += r.science / n; a.avgMinAir += minAir / n; a.avgMinFood += minFood / n; a.avgMaxDose += Math.max.apply(null, s.crew.map(p => p.dose)) / n;
+    }
+    for (const k of ['avgScience', 'avgMinAir', 'avgMinFood', 'avgMaxDose']) a[k] = Math.round(a[k] * 100) / 100;
+    out[mode] = a;
+  }
+  return out;
+}
+function selfTest() {
+  const out = [], ok = (name, pass, detail) => out.push({ name, pass: !!pass, detail: detail === undefined ? '' : String(detail) });
+  const near = (a, b) => Math.abs(a - b) < 1e-6;
+  const sched = s => s.schedule.map(d => d.kind[0] + (d.eventId || '-') + d.weather[0] + (d.storm ? 'S' : '')).join(' ');
+  // чистая «лабораторная» миссия без событий для юнит-проверок
+  const mk = (sol, edit) => {
+    const s = createMission('unit test', 'commander');
+    for (const d of s.schedule) { d.kind = 'quiet'; d.eventId = null; d.storm = null; d.weather = 'clear'; d.real = []; }
+    s.sol = sol; s.supply = 10; s.phase = PHASE.PLAN;
+    if (edit) edit(s);
+    return s;
+  };
+  const plan = (cells, jobs) => ({ cells: Object.assign({ life: 3, shield: 0, greenhouse: 0, radio: 0, lab: 0 }, cells), jobs: Object.assign({ leo: 'rest', mei: 'rest', amara: 'rest', otto: 'rest', sam: 'rest' }, jobs) });
+  const run = (s, p) => playSol(applyPlan(s, p)).state;
+  const stepSol = (s, p) => { let t = proceed(run(s, p)); if (t.phase === PHASE.RADIO) t = sendMessage(t, null); return startPlanning(t); };
+  try {
+    const a = runMission('Brave Otter', 'commander', 'careful'), b = runMission('Brave Otter', 'commander', 'careful');
+    ok('Same name + same choices = same result', JSON.stringify(a) === JSON.stringify(b));
+    ok('Seed ignores case and "Mission" prefix', sched(createMission('mission BRAVE  otter', 'cadet')) === sched(createMission('Brave Otter', 'cadet')));
+    ok('Different names give a different Mars', sched(createMission('Brave Otter', 'cadet')) !== sched(createMission('Quiet Falcon', 'cadet')));
+    ok('Cadet and Commander share one schedule', sched(createMission('Brave Otter', 'cadet')) === sched(createMission('Brave Otter', 'commander')));
+
+    let bad = '', long = '', noReal = 0, kinds = { trouble: 0, chance: 0, quiet: 0 };
+    const wins = { cadet: 0, commander: 0 }, N = 15;
+    for (const mode of ['cadet', 'commander']) for (let i = 0; i < N; i++) {
+      const prev = {};
+      const s = runMission('seed ' + i, mode, 'careful', t => {
+        const c = cfg(t.mode);
+        if (t.air < 0 || t.air > c.TANK_MAX || t.food < 0 || t.food > c.TANK_MAX) bad = 'tank out of range';
+        if (t.crop < 0 || t.crop >= c.CROP_STEPS_TO_HARVEST) bad = 'crop out of range';
+        if (planTotal(t.plan) > cellsAvailable(t)) bad = 'more cells shared than supplied';
+        for (const p of t.crew) { if (prev[p.id] !== undefined && p.dose < prev[p.id] - 1e-9) bad = 'dose went down'; prev[p.id] = p.dose; }
+        if (t.morning) for (const l of t.morning.lines.concat(t.morning.notes, t.morning.answers)) if (wordCount(l) > 15) long = l;
+      });
+      if (endMission(s).stars[0]) wins[mode]++;
+      if (!s.schedule.some(d => d.real.some(e => e.type === 'SEP'))) noReal++;
+      if (mode === 'cadet') for (const d of s.schedule) kinds[d.kind === 'trouble' ? 'trouble' : d.kind === 'chance' ? 'chance' : 'quiet']++;
+    }
+    ok('Invariants hold over ' + 2 * N + ' bot missions', !bad, bad);
+    ok('Morning lines are 15 words or fewer', !long, long);
+    ok('Every mission has a real-data solar storm', noReal === 0, noReal + ' without');
+    ok('Careful bot brings the crew home', wins.cadet === N && wins.commander === N, 'cadet ' + wins.cadet + '/' + N + ', commander ' + wins.commander + '/' + N);
+    ok('Event mix is roughly one third each', true, 'trouble ' + kinds.trouble + ' / chance ' + kinds.chance + ' / quiet ' + kinds.quiet + ' over ' + N + ' missions');
+
+    const lost = runMission('Brave Otter', 'commander', 'lazy'), rep = endMission(lost);
+    ok('Neglect ends in an early return, nobody dies', !rep.won && lost.sol < 15, 'sol ' + lost.sol + ', tank: ' + rep.why);
+    ok('Losing names the decision that mattered', rep.mattered.length > 10, rep.mattered);
+
+    let s = run(mk(6), plan({ greenhouse: 1 }, { amara: 'grow' }));
+    ok('Botanist grows twice as well', near(s.crop, 3), 'crop ' + s.crop);
+    s = run(mk(6), plan({ greenhouse: 1 }, { leo: 'grow' }));
+    ok('Non-specialist grows one step', near(s.crop, 2), 'crop ' + s.crop);
+    s = run(mk(6), plan({ greenhouse: 0 }, { amara: 'grow' }));
+    ok('Dark greenhouse: crops wait', near(s.crop, 0), 'crop ' + s.crop);
+    const CS = CONFIG.CROP_STEPS_TO_HARVEST, HF = CONFIG.HARVEST_FOOD;
+    s = run(mk(6, t => { t.crop = CS - 1; t.food = 5; }), plan({ greenhouse: 3 }, {}));
+    ok('Harvest at ' + CS + ' steps: food +' + HF + ', crew eats 1', near(s.food, 5 + HF - 1) && near(s.crop, 2), 'food ' + s.food + ', crop ' + s.crop);
+    s = run(mk(6), plan({ life: 1 }, {}));
+    ok('Life support 2 cells short: air −2', near(s.air, 6), 'air ' + s.air);
+    s = run(mk(6, t => { t.air = 5; }), plan({ life: 4 }, {}));
+    ok('Extra life support cell: air +1', near(s.air, 6), 'air ' + s.air);
+    s = run(mk(6), plan({ life: 3 }, {}));
+    ok('Unused cells are lost at sunset', s.lastResults.some(r => r.t.indexOf('lost at sunset') >= 0) && s.battery === 0);
+
+    s = run(mk(6, t => { addProblem(t, 'hull_crack'); }), plan({}, { leo: 'outside' }));
+    ok('Engineer fixes a hull crack alone in one sol', s.problems.length === 0, 'open: ' + s.problems.length);
+    s = run(mk(6, t => { addProblem(t, 'hull_crack'); }), plan({}, { sam: 'outside' }));
+    ok('A non-engineer needs two sols; the crack leaks', s.problems.length === 1 && near(s.problems[0].done, 1) && near(s.air, 7), 'air ' + s.air);
+    s = mk(6, t => { addProblem(t, 'hull_crack'); });
+    s = stepSol(stepSol(s, plan({}, {})), plan({}, {}));
+    ok('Trouble left alone grows', s.problems[0].severity === 2 && near(s.air, 6), 'severity ' + s.problems[0].severity + ', air ' + s.air);
+
+    s = mk(6); s = stepSol(s, plan({}, { sam: 'outside' })); s = stepSol(s, plan({}, { sam: 'outside' }));
+    ok('Two heavy sols in a row make a person tired', crewById(s, 'sam').cond === 'tired');
+    const t3 = run(s, plan({}, { sam: 'outside' }));
+    ok('Heavy work while tired ends in the medbay', crewById(t3, 'sam').medbay === 2);
+    const idle = stepSol(stepSol(mk(6), plan({}, { leo: 'fix' })), plan({}, { leo: 'fix' }));
+    ok('Fix with nothing broken is not heavy work', crewById(idle, 'leo').cond === 'fine' && crewById(idle, 'leo').heavyStreak === 0);
+    const t4 = stepSol(s, plan({}, { sam: 'rest' }));
+    ok('A rest sol removes tired', crewById(t4, 'sam').cond === 'fine');
+    let m = mk(6, t => { enterMedbay(t, crewById(t, 'leo'), 2, 'test'); });
+    ok('Medic care shortens the medbay stay', crewById(run(m, plan({}, { mei: 'care' })), 'leo').medbay === 0 && crewById(run(m, plan({}, {})), 'leo').medbay === 1);
+
+    const storm = t => { t.schedule[5].storm = { day: 0, date: 'test', label: 'test' }; };
+    const d0 = 0.67;
+    s = run(mk(6, storm), plan({ shield: 3 }, {}));
+    ok('Storm, full shield: minimum dose inside', near(crewById(s, 'leo').dose, d0), crewById(s, 'leo').dose);
+    s = run(mk(6, storm), plan({ shield: 0 }, {}));
+    ok('Storm, no shield: dose x3 inside', near(crewById(s, 'leo').dose, d0 * 3), crewById(s, 'leo').dose);
+    s = run(mk(6, storm), plan({ shield: 3 }, { sam: 'outside' }));
+    ok('Storm, outside: full storm dose despite shield', near(crewById(s, 'sam').dose, (d0 + 1) * 3), crewById(s, 'sam').dose);
+    s = run(mk(6), plan({}, { sam: 'outside' }));
+    ok('A normal trip outside adds 1 mSv', near(crewById(s, 'sam').dose, d0 + 1) && near(crewById(s, 'leo').dose, d0));
+    s = run(mk(6, t => { crewById(t, 'sam').dose = CONFIG.BADGE_RED_MSV - 0.5; }), plan({}, { sam: 'outside' }));
+    ok('Red badge keeps a person inside', crewById(s, 'sam').grounded && !jobAllowed(s, crewById(s, 'sam'), 'outside').ok);
+
+    s = run(mk(6, t => { t.samples = 1; }), plan({ lab: 2 }, { otto: 'lab' }));
+    ok('Scientist turns a sample into a card in one sol', s.cards.found.includes('lab_1') && near(s.samples, 0));
+    s = run(mk(6, t => { t.samples = 1; }), plan({ lab: 1 }, { otto: 'lab' }));
+    ok('Underpowered lab: no science', !s.cards.found.includes('lab_1'));
+    s = proceed(run(mk(6, t => { t.cards.found = ['layered_rock', 'lab_1']; }), plan({ radio: 1 }, {})));
+    const sent = sendMessage(s, 'science');
+    ok('Science counts only when the report is sent', s.phase === PHASE.RADIO && s.science === 0 && sent.science === CONFIG.SCIENCE_PER_CARD.chance + CONFIG.SCIENCE_PER_CARD.lab + CONFIG.SCIENCE_PER_CARD.milestone, 'science ' + sent.science);
+    s = proceed(run(mk(6), plan({ radio: 1 }, {})));
+    const fc = sendMessage(s, 'forecast');
+    ok('Forecast answer arrives next morning', fc.sol === 7 && fc.known.includes(8) && fc.known.includes(9) && fc.morning.answers.length === 1);
+    s = applyPlan(mk(11), plan({ radio: 1 }, {}));
+    ok('Radio blackout on sols 11 and 12', s.plan.cells.radio === 0 && !radioCanSend(playSol(s).state));
+    s = runMission('Brave Otter', 'commander', 'careful');
+    ok('Mission ends after sol 15 with a report', s.phase === PHASE.REPORT && s.sol === 15 && endMission(s).doses.length === 5);
+    let threw = false; try { go({ phase: PHASE.BRIEFING }, PHASE.RADIO); } catch (e) { threw = true; }
+    ok('State machine rejects illegal transitions', threw);
+  } catch (e) { ok('Self-test crashed', false, e && e.stack ? e.stack.split('\n').slice(0, 2).join(' | ') : e); }
+  return out;
+}
+
+/* ============================== 5. UI (Canvas) ============================== */
+const cv = document.getElementById('c'), g = cv.getContext('2d');
+const W = 1280, H = 720;
+const COL = { bg: '#1b1b1b', panel: '#262626', line: '#555', text: '#e0e0e0', dim: '#959595', good: '#7ac77a', warn: '#e0b84c', bad: '#e36a6a', btn: '#383838', sel: '#d8d8d8' };
+let G = null; // текущее состояние игры (null = титульный экран)
+const ui = { hits: [], focusId: 'name', hoverId: null, px: 1, name: randomMissionName(), mode: 'cadet', pick: null, overlay: null, debug: false, helperKey: '', helperOn: false, album: [], hasSave: false };
+
+// --- хранение (мягко деградирует, если localStorage недоступен) ---
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* без сохранения */ } },
+  del(k) { try { localStorage.removeItem(k); } catch (e) { /* без сохранения */ } },
+};
+function save() {
+  if (!G) return;
+  let changed = false;
+  for (const id of G.cards.found) if (!ui.album.includes(id)) { ui.album.push(id); changed = true; }
+  if (changed) store.set('marsOutpost.album', ui.album);
+  if (G.phase === PHASE.REPORT) { store.del('marsOutpost.save'); ui.hasSave = false; } else { store.set('marsOutpost.save', G); ui.hasSave = true; }
+}
+function setG(s) { G = s; ui.pick = null; save(); }
+
+// --- примитивы ---
+function rect(x, y, w, h, fill, stroke, lw) {
+  if (fill) { g.fillStyle = fill; g.fillRect(x, y, w, h); }
+  if (stroke) { g.strokeStyle = stroke; g.lineWidth = lw || 1; g.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1); }
+}
+function text(str, x, y, size, color, align, bold) {
+  g.font = (bold ? 'bold ' : '') + (size || 14) + 'px Consolas, Menlo, monospace';
+  g.fillStyle = color || COL.text; g.textAlign = align || 'left'; g.textBaseline = 'alphabetic';
+  g.fillText(String(str), x, y);
+}
+function wrap(str, x, y, maxW, size, color, lh) {
+  g.font = size + 'px Consolas, Menlo, monospace';
+  let line = '';
+  for (const w of String(str).split(' ')) {
+    const t = line ? line + ' ' + w : w;
+    if (g.measureText(t).width > maxW && line) { text(line, x, y, size, color); y += lh; line = w; } else line = t;
+  }
+  if (line) { text(line, x, y, size, color); y += lh; }
+  return y;
+}
+function circle(x, y, r, fill, stroke) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); if (fill) { g.fillStyle = fill; g.fill(); } if (stroke) { g.strokeStyle = stroke; g.lineWidth = 1.5; g.stroke(); } }
+function panel(x, y, w, h, title) { rect(x, y, w, h, COL.panel, COL.line); if (title) text(title, x + 10, y + 20, 13, COL.dim, 'left', true); }
+function bar(x, y, w, h, val, max, label, color) {
+  text(label, x, y - 4, 12, COL.dim);
+  rect(x, y, w, h, '#111', COL.line);
+  rect(x + 1, y + 1, Math.max(0, (w - 2) * clamp(val / max, 0, 1)), h - 2, color || COL.text);
+}
+function button(id, x, y, w, h, label, fn, o) {
+  o = o || {};
+  const en = o.enabled !== false, hov = en && ui.hoverId === id, sub = o.sub || [];
+  rect(x, y, w, h, o.selected ? COL.sel : en ? (hov ? '#4c4c4c' : COL.btn) : '#222', o.primary && en ? '#fff' : en ? '#8a8a8a' : '#3a3a3a', o.primary ? 2 : 1);
+  const tc = o.selected ? '#111' : en ? COL.text : '#5c5c5c';
+  if (!sub.length) text(label, x + w / 2, y + h / 2 + (o.size || 14) * 0.36, o.size || 14, tc, 'center', !!o.bold);
+  else { text(label, x + 12, y + 22, 15, tc, 'left', true); sub.forEach((t, i) => text(t, x + 12, y + 41 + i * 17, 13, en ? COL.dim : '#5c5c5c')); }
+  if (en && ui.focusId === id) { g.setLineDash([5, 4]); rect(x - 3, y - 3, w + 6, h + 6, null, '#fff', 2); g.setLineDash([]); }
+  ui.hits.push({ id, x, y, w, h, fn, en, primary: !!o.primary });
+}
+function showMsv() { return !!G && (cfg(G.mode).SHOW_MSV || ui.debug); }
+
+// --- подсказчик: одна строка ≤ 15 слов, реагирует на план ---
+function helperLine() {
+  const c = cfg(G.mode), day = dayOf(G), names = {};
+  for (const p of G.crew) names[p.id] = p;
+  if (G.phase === PHASE.BRIEFING) {
+    if (G.sol === 1) return 'Welcome, Captain! Read the morning news, then plan the sol.';
+    if (day.storm) return 'A solar storm hits today. Power the shield to keep dose low.';
+    if (isBlackout(G)) return 'The Sun blocks the radio today. Earth cannot hear us.';
+    return 'Read the morning news, then plan the sol.';
+  }
+  if (G.phase === PHASE.PLAN) {
+    const free = cellsAvailable(G) - planTotal(G.plan), pc = G.plan.cells, jobs = effectiveJobs(G);
+    const tired = G.crew.find(p => p.cond === 'tired' && c.HEAVY_JOBS.includes(jobs[p.id]));
+    const ill = G.crew.find(p => p.sick && p.medbay <= 0 && jobs[p.id] !== 'rest');
+    const labber = G.crew.find(p => jobs[p.id] === 'lab');
+    const fixer = G.crew.find(p => jobs[p.id] === 'fix');
+    if (ill) return ill.name + ' is ill and must rest, or it gets worse.';
+    if (tired) return tired.name + ' is tired. Heavy work will hurt. Give them a rest.';
+    if (pc.life < c.SYSTEMS.life.want) return 'Life support is short. Air and water will drop tonight.';
+    if (day.storm && pc.shield < c.SYSTEMS.shield.want) return 'Storm today and the shield is weak. Everyone gets extra dose.';
+    if (labber && pc.lab < c.SYSTEMS.lab.want) return 'The lab is dark. ' + labber.name + ' can\'t work there without power.';
+    if (labber && G.samples < 1) return 'No samples yet. ' + labber.name + ' has nothing to study in the lab.';
+    if (fixer && !G.problems.some(p => c.PROBLEMS[p.type].where === 'inside')) return 'Nothing is broken inside. ' + fixer.name + ' has nothing to fix.';
+    if (free > 0) return 'You have ' + plural(free, 'free cell') + '. Unused cells are lost at sunset.';
+    if (G.sol >= c.JOB_UNLOCK_SOL && G.crew.every(p => jobs[p.id] === 'rest' || jobs[p.id] === 'medbay')) return 'Everyone is resting. Give the crew jobs with the buttons.';
+    return 'Every choice costs something. Check the plan, then go.';
+  }
+  if (G.phase === PHASE.EVENT) {
+    const ev = currentEvent(G), ch = G.today.choice;
+    if (ui.pick) return 'Pick who goes. Check their dose badge first.';
+    if (ch && ch.id === 'use_now' && cellsAvailable(G) > planTotal(G.plan)) return 'Extra cells! Go back to the plan to share them.';
+    if (ch) return 'Ready? Press Play to run the sol.';
+    if (ev && ev.kind === 'chance') return 'A chance! Going outside adds dose. You can let it go.';
+    return 'No choice is free. Read the prices, then pick one.';
+  }
+  if (G.phase === PHASE.RESULTS) {
+    if (G.counters.airZero || G.counters.foodZero) return 'A tank is empty! One more empty sol ends the mission.';
+    return 'Each line shows what changed and why.';
+  }
+  if (G.phase === PHASE.RADIO) return 'One message tonight. Earth answers at breakfast.';
+  return '';
+}
+function whyText() {
+  const c = cfg(G.mode), S = c.SYSTEMS, w = c.CELLS_BY_WEATHER;
+  if (G.phase === PHASE.BRIEFING) return ['Each morning you learn what changed overnight and Earth answers last night\'s message.',
+    'The sky sets today\'s energy: clear ' + w.clear + ' cells, hazy ' + w.hazy + ', dust storm ' + w.dust + '.',
+    'A solar particle storm raises everyone\'s dose unless the shield has full power.'];
+  if (G.phase === PHASE.PLAN) return ['The systems want more cells than the Sun gives, so something always goes short.',
+    'Life support wants ' + S.life.want + ': each missing cell costs 1 air & water tonight. A 4th cell gives 1 back.',
+    'The shield (' + S.shield.want + ') only matters when a solar storm hits. The greenhouse grows 1 crop step per cell; ' + c.CROP_STEPS_TO_HARVEST + ' steps = harvest, Food +' + c.HARVEST_FOOD + '.',
+    'The radio needs ' + S.radio.want + ' cell to send tonight\'s message. The lab needs ' + S.lab.want + ' cells or no science happens.',
+    'Each person does one job per sol. Specialists do their own job twice as well: engineer fix, medic care, botanist grow, scientist lab, pilot outside.',
+    c.HEAVY_SOLS_TO_TIRED + ' heavy sols in a row (fix, outside) make a person tired: half effect until they rest. Heavy work while tired means the medbay.',
+    'Every trip outside adds ' + c.DOSE_OUTSIDE_TRIP + ' mSv to the dose badge. The badge only fills.'];
+  if (G.phase === PHASE.EVENT) return ['Trouble has 2 or 3 choices and none is free. Trouble left alone grows where you can see it.',
+    'A chance is tempting: go outside (card + sample, but dose and a lost job), scan from the lab (needs lab power and the scientist), or let it go.',
+    'At these levels nobody feels ill. Astronauts still keep dose as low as they can, because it adds up over a whole career.',
+    'You can go back to the plan and change cells or jobs before you play the sol.'];
+  if (G.phase === PHASE.RESULTS) return ['Every line names a change and its cause. Nothing here is a hidden dice roll: the same plan on the same Mars gives the same result.',
+    'If air & water or food stays at 0 for ' + c.ZERO_SOLS_TO_LOSE + ' sols in a row, Mission Control calls the crew home early. Nobody dies.'];
+  if (G.phase === PHASE.RADIO) return ['One message per sol, and only if the radio had a cell. Earth answers at breakfast.',
+    'Science only counts for cards that were sent home with the science report.',
+    'On sols ' + c.BLACKOUT_SOLS.join(' and ') + ' the Sun sits between Mars and Earth (solar conjunction), so the radio cannot reach Earth.',
+    'Radio signals need 3 to 22 minutes one way, so nobody steers a Mars mission live. (Source: NASA/JPL)'];
+  return [''];
+}
+
+// --- экраны ---
+function drawTitle() {
+  text('MARS OUTPOST', 60, 80, 40, '#fff', 'left', true);
+  text('greybox mechanics prototype · no art, no sound', 60, 110, 15, COL.dim);
+  text('Mission name (same name = same Mars):', 60, 170, 15);
+  const foc = ui.focusId === 'name';
+  rect(60, 182, 360, 40, '#111', foc ? '#fff' : COL.line, foc ? 2 : 1);
+  text('Mission ' + ui.name + (foc ? '_' : ''), 72, 208, 18, '#fff');
+  ui.hits.push({ id: 'name', x: 60, y: 182, w: 360, h: 40, fn: () => { ui.focusId = 'name'; }, en: true, primary: false });
+  button('rand', 432, 182, 150, 40, 'Random name', () => { ui.name = randomMissionName(); });
+  text('Mode:', 60, 262, 15);
+  button('m-cadet', 60, 274, 255, 54, 'Cadet', () => { ui.mode = 'cadet'; }, { selected: ui.mode === 'cadet', sub: ['helper hints, gentler storms'] });
+  button('m-commander', 327, 274, 255, 54, 'Commander', () => { ui.mode = 'commander'; }, { selected: ui.mode === 'commander', sub: ['real mSv, forecast by radio'] });
+  button('launch', 60, 356, 522, 60, 'LAUNCH MISSION ▶', () => { setG(createMission(ui.name || 'Brave Otter', ui.mode)); ui.focusId = null; }, { primary: true, size: 20, bold: true });
+  if (ui.hasSave) button('cont', 60, 428, 522, 40, 'Continue saved mission', () => { const s = store.get('marsOutpost.save'); if (s && s.v === 1) { G = s; ui.focusId = null; } else ui.hasSave = false; });
+  let ky = 500;
+  for (const l of ['Keys: Tab / arrows = move focus · Enter = press · D = debug · T = self-test · A = auto-play a sol (in a mission).',
+    'Type to change the mission name while the name box is focused.',
+    'Balance numbers: CONFIG block at the top of this file. Console: MarsOutpost.balanceReport(50)']) ky = wrap(l, 60, ky, 540, 13, COL.dim, 18) + 6;
+  panel(660, 60, 560, 500, 'DISCOVERY ALBUM · ' + ui.album.length + ' of ' + CARDS.length + ' found (kept between missions)');
+  CARDS.forEach((k, i) => {
+    const y = 110 + i * 27, has = ui.album.includes(k.id);
+    rect(676, y - 13, 14, 14, has ? COL.text : null, COL.text);
+    text(has ? k.title : '???  hint: ' + k.hint, 700, y, 14, has ? COL.text : COL.dim);
+  });
+}
+
+function drawHUD() {
+  const c = cfg(G.mode), day = dayOf(G), st = stormOn(G), N = c.MISSION_SOLS;
+  rect(0, 0, W, 98, '#222', null);
+  text('SOL ' + G.sol + '/' + N, 12, 28, 24, '#fff', 'left', true);
+  text('Mission ' + G.name + ' · ' + G.mode, 170, 26, 14, COL.dim);
+  let sky = 'Sky: ' + day.weather.toUpperCase() + ' · ' + cellsAvailable(G) + ' cells';
+  if (st) sky += ' · SOLAR STORM x' + st.mult;
+  if (isBlackout(G)) sky += ' · RADIO BLACKOUT';
+  text(sky, 520, 26, 14, st ? COL.warn : COL.text);
+  button('menu', 1180, 8, 90, 26, 'Menu', () => { G = null; ui.focusId = 'name'; ui.pick = null; }, { size: 12 });
+  bar(12, 54, 200, 14, G.air, c.TANK_MAX, 'Air & water ' + fmt(G.air) + '/' + c.TANK_MAX, G.air <= 2 ? COL.bad : COL.text);
+  bar(232, 54, 200, 14, G.food, c.TANK_MAX, 'Food ' + fmt(G.food) + '/' + c.TANK_MAX, G.food <= 2 ? COL.bad : COL.text);
+  bar(452, 54, 200, 14, G.crop, c.CROP_STEPS_TO_HARVEST, 'Crop ' + fmt(G.crop) + '/' + c.CROP_STEPS_TO_HARVEST + ' steps');
+  text('Science ' + G.science + '/' + c.SCIENCE_TARGET, 680, 66, 14);
+  text('Cards ' + G.cards.found.length + ' (sent ' + G.cards.sent.length + ')', 830, 66, 14);
+  text('Samples ' + fmt(G.samples), 1010, 66, 14);
+  const sym = { intro: '+', quiet: '·', trouble: '!', chance: '*', ship: '^' };
+  for (let i = 1; i <= N; i++) {
+    const x = 12 + (i - 1) * 24, d = dayOf(G, i), past = i < G.sol, cur = i === G.sol;
+    rect(x, 76, 20, 18, past ? '#555' : cur ? '#fff' : null, COL.line);
+    const shown = past || ui.debug || (cur && (G.today.revealed || d.storm || d.kind === 'intro' || d.kind === 'ship'));
+    text(shown ? sym[d.kind] : cur ? '?' : String(i), x + 10, 90, shown || cur ? 14 : 10, cur ? '#111' : past ? '#ddd' : COL.dim, 'center', true);
+  }
+  text('+ new piece  · quiet  ! trouble  * chance  ^ ship', 12 + N * 24 + 10, 90, 12, COL.dim);
+}
+
+function drawBadge(x, y, p, c) {
+  const b = badgeOf(c, p.dose), w = 150, max = c.BADGE_RED_MSV * 1.1, col = b === 'green' ? COL.good : b === 'amber' ? COL.warn : COL.bad;
+  // форма отличается, не только цвет: круг / треугольник / квадрат
+  if (b === 'green') circle(x + 8, y + 8, 7, col, null);
+  else if (b === 'amber') { g.beginPath(); g.moveTo(x + 8, y); g.lineTo(x + 16, y + 15); g.lineTo(x, y + 15); g.closePath(); g.fillStyle = col; g.fill(); }
+  else rect(x + 1, y + 1, 14, 14, col, null);
+  rect(x + 24, y + 2, w, 12, '#111', COL.line);
+  rect(x + 25, y + 3, (w - 2) * clamp(p.dose / max, 0, 1), 10, col, null);
+  for (const t of [c.BADGE_AMBER_MSV, c.BADGE_RED_MSV]) rect(x + 24 + w * t / max, y, 1, 16, '#fff', null);
+  text(b.toUpperCase() + (showMsv() ? ' ' + fmt2(p.dose) + ' mSv' : ''), x + 24 + w + 8, y + 13, 12, col);
+}
+
+function drawCrew() {
+  const c = cfg(G.mode), jobs = effectiveJobs(G), planning = G.phase === PHASE.PLAN, ch = G.today.choice, st = stormOn(G), sh = effectiveCells(G).shield;
+  const pickDef = ui.pick ? eventChoices(G).find(x => x.id === ui.pick.id) : null;
+  panel(650, 104, 620, 494, 'CREW · badge: circle = green, triangle = amber, square = red');
+  G.crew.forEach((p, i) => {
+    const y = 130 + i * 93;
+    if (i) rect(660, y - 5, 600, 1, '#3a3a3a', null);
+    const letter = p.medbay > 0 ? 'M' : p.sick ? 'S' : p.cond === 'tired' ? 'T' : 'F';
+    circle(678, y + 24, 17, null, COL.text); text(letter, 678, y + 30, 17, COL.text, 'center', true);
+    text(p.name, 704, y + 18, 16, '#fff', 'left', true); text(p.role, 760, y + 18, 12, COL.dim);
+    const cond = p.medbay > 0 ? 'MEDBAY: ' + plural(Math.ceil(p.medbay), 'sol') + ' left' : p.sick ? 'ILL: must rest' : p.cond === 'tired' ? 'TIRED: half effect' : 'fine';
+    text(cond + (p.grounded ? ' · stays inside' : ''), 704, y + 36, 12, cond === 'fine' ? COL.dim : COL.warn);
+    drawBadge(900, y + 4, p, c);
+    if (pickDef) { // выбор экипажа для события: превью значка «до → после»
+      const okP = p.medbay <= 0 && !(pickDef.pick.job === 'outside' && p.grounded), on = ui.pick.ids.includes(p.id);
+      if (okP) {
+        const after = p.dose + doseFor(c, st, pickDef.pick.job, sh).d, b0 = badgeOf(c, p.dose), b1 = badgeOf(c, after);
+        let note = 'badge after: ' + b1.toUpperCase() + (showMsv() ? ' (' + fmt2(p.dose) + ' → ' + fmt2(after) + ' mSv)' : b0 !== b1 ? ' (was ' + b0 + ')' : '');
+        if (p.cond === 'tired') note += ' · TIRED: will get hurt';
+        if (p.sick) note += ' · ILL: will get worse';
+        text(note, 704, y + 62, 12, b1 !== 'green' || p.cond === 'tired' || p.sick ? COL.warn : COL.dim);
+        button('pick:' + p.id, 1150, y + 44, 110, 30, on ? 'PICKED ✓' : 'Pick', () => {
+          const ids = ui.pick.ids, k = ids.indexOf(p.id);
+          if (k >= 0) ids.splice(k, 1); else { if (ids.length >= pickDef.pick.max) ids.shift(); ids.push(p.id); }
+        }, { selected: on });
+      } else text('cannot go', 704, y + 62, 12, COL.dim);
+      return;
+    }
+    const locked = ch && G.today.revealed && jobs[p.id] !== (G.plan.jobs[p.id] || 'rest') && p.medbay <= 0;
+    if (planning && G.sol >= c.JOB_UNLOCK_SOL && p.medbay <= 0 && !locked) {
+      JOB_KEYS.forEach((j, k) => {
+        const a = jobAllowed(G, p, j);
+        button('job:' + p.id + ':' + j, 660 + k * 100, y + 50, 94, 28, j === c.SPECIALIST_OF[p.role] ? j + ' x2' : j, () => {
+          const pl = clone(G.plan); pl.jobs[p.id] = j; setG(applyPlan(G, pl));
+        }, { enabled: a.ok, selected: G.plan.jobs[p.id] === j, size: 13 });
+      });
+    } else {
+      const j = jobs[p.id];
+      text('Today: ' + j + (locked ? ' (event choice)' : '') + (G.sol < c.JOB_UNLOCK_SOL ? ' (jobs open on sol ' + c.JOB_UNLOCK_SOL + ')' : ''), 704, y + 66, 14, COL.text);
+    }
+  });
+}
+
+function drawBriefing() {
+  const M = getMorning(G);
+  panel(10, 104, 630, 494, 'MORNING BRIEFING · SOL ' + G.sol);
+  let y = 150;
+  for (const l of M.lines) { text('• ' + l, 24, y, 15); y += 24; }
+  for (const l of M.notes) { text('• ' + l, 24, y, 15, COL.warn); y += 24; }
+  for (const l of M.answers) { text('EARTH: ' + l, 24, y, 15, '#fff', 'left', true); y += 24; }
+  y += 6;
+  if (M.unlocked.length) { text('NEW TODAY: ' + M.unlocked.join(', '), 24, y, 15, COL.good, 'left', true); y += 24; }
+  for (const l of M.words) { text('NEW WORD · ' + l, 24, y, 13, COL.dim); y += 20; }
+  for (const e of M.real) {
+    rect(24, y, 600, 44, '#111', COL.warn);
+    text('REAL EVENT · ' + e.date + ' · ' + e.label + ' · ' + e.seenAt, 34, y + 18, 13, COL.warn, 'left', true);
+    text('Source: ' + e.source + (e.verified ? '' : ' · PLACEHOLDER DATA, NOT VERIFIED'), 34, y + 36, 12, COL.dim);
+    y += 52;
+  }
+  if (M.storm) { text('Solar storm today: dose x' + M.storm.mult + ' unless the shield is fully powered.', 24, y + 6, 14, COL.warn); y += 28; }
+  if (M.blackout) { text('Radio blackout today: the Sun is between Mars and Earth.', 24, y + 6, 14, COL.warn); y += 28; }
+  text('TODAY: ' + M.weather.toUpperCase() + ' sky · ' + M.cells + ' energy cells', 24, y + 10, 17, '#fff', 'left', true);
+  text('(' + M.cellNotes.join(', ') + ')', 24, y + 30, 12, COL.dim); y += 54;
+  for (const f of M.forecast) { text('FORECAST sol ' + f.sol + ': ' + f.weather + ', ' + f.cells + ' cells' + (f.storm ? ', SOLAR STORM x' + f.storm : ', no storm'), 24, y, 14, f.storm ? COL.warn : COL.text); y += 22; }
+  button('go', 910, 610, 360, 100, 'PLAN THE SOL ▶', () => setG(startPlanning(G)), { primary: true, size: 20, bold: true });
+}
+
+function drawPlan() {
+  const c = cfg(G.mode), avail = cellsAvailable(G), free = avail - planTotal(G.plan), st = stormOn(G), cells = G.plan.cells;
+  panel(10, 104, 630, 494, 'PLAN THE SOL · share the cells, give each person one job');
+  text('Cells today: ' + avail + ' · free: ' + free, 24, 150, 17, free > 0 ? COL.warn : '#fff', 'left', true);
+  text('(' + G.supplyNotes.join(', ') + ')', 290, 150, 12, COL.dim);
+  SYS_KEYS.forEach((k, i) => {
+    const y = 166 + i * 54, d = c.SYSTEMS[k], n = cells[k], open = isUnlocked(G, k), black = k === 'radio' && isBlackout(G);
+    text(d.name, 24, y + 22, 15, open ? COL.text : '#666', 'left', true);
+    for (let j = 0; j < d.max; j++) rect(200 + j * 24, y + 6, 20, 20, j < n ? COL.text : null, j < d.want ? COL.text : '#666');
+    button('minus:' + k, 304, y + 2, 34, 30, '−', () => { const pl = clone(G.plan); pl.cells[k]--; setG(applyPlan(G, pl)); }, { enabled: open && n > 0, size: 18 });
+    button('plus:' + k, 344, y + 2, 34, 30, '+', () => { const pl = clone(G.plan); pl.cells[k]++; setG(applyPlan(G, pl)); }, { enabled: open && !black && n < d.max && free > 0, size: 18 });
+    if (!open) { text('opens on sol ' + d.unlockSol, 392, y + 22, 13, '#666'); return; }
+    const short = d.want - n;
+    text(n + ' of ' + d.want + (short > 0 ? ' · ' + short + ' short' : n > d.want ? ' · +' + (n - d.want) + ' extra' : ' · OK'), 392, y + 16, 14, short > 0 ? COL.warn : COL.good, 'left', true);
+    let eff = '';
+    if (k === 'life') eff = short > 0 ? 'Air & water −' + short * c.AIR_LOSS_PER_MISSING_CELL + ' tonight' : short < 0 ? 'Air & water +' + (-short) * c.AIR_GAIN_PER_EXTRA_CELL + ' tonight' : 'Air & water stays level';
+    if (k === 'shield') eff = !st ? 'No storm today: shield not needed' : short <= 0 ? 'Storm dose inside: minimum' : 'Storm dose inside: ' + (showMsv() ? fmt2(doseFor(c, st, 'rest', n).d) + ' mSv each' : 'higher');
+    if (k === 'greenhouse') eff = n > 0 ? 'Crop +' + n * c.STEPS_PER_GREENHOUSE_CELL + ' steps, plus crew help' : 'Crops wait';
+    if (k === 'radio') eff = black ? 'BLACKOUT: the Sun is in the way' : radioBlocked(G) ? 'Antenna is off: no radio' : short <= 0 ? 'Message to Earth tonight' : 'No message tonight';
+    if (k === 'lab') eff = short <= 0 ? 'Lab works: samples become cards' : 'Lab dark: no science';
+    text(eff, 392, y + 34, 12, COL.dim);
+  });
+  let y = 452;
+  if (G.problems.length) {
+    text('OPEN TROUBLE:', 24, y, 13, COL.warn, 'left', true); y += 18;
+    for (const p of G.problems.slice(0, 3)) { const pd = c.PROBLEMS[p.type]; text(pd.name + ' (' + pd.where + ') · repair ' + fmt(p.done) + '/' + fmt(problemNeed(c, p)) + ' · every sol: ' + problemEffect(c, p), 24, y, 13, COL.warn); y += 17; }
+  }
+  const fc = G.known.filter(n => n > G.sol).sort((a, b) => a - b).map(n => forecastFor(G, n));
+  for (const f of fc.slice(0, 2)) { text('Forecast sol ' + f.sol + ': ' + f.weather + ', ' + f.cells + ' cells' + (f.storm ? ', SOLAR STORM x' + f.storm : ', no storm'), 24, y + 4, 13, f.storm ? COL.warn : COL.dim); y += 17; }
+  const pv = previewSol(G);
+  text('Tonight with this plan: Air & water ' + fmt(G.air) + '→' + fmt(pv.air) + ' · Food ' + fmt(G.food) + '→' + fmt(pv.food) + ' · Crop ' + fmt(G.crop) + '→' + fmt(pv.crop), 24, 586, 13, '#fff');
+  button('go', 910, 610, 360, 100, G.today.revealed && currentEvent(G) ? 'BACK TO THE EVENT ▶' : 'DONE PLANNING ▶', () => setG(confirmPlan(G)), { primary: true, size: 20, bold: true });
+}
+
+function drawEvent() {
+  const c = cfg(G.mode), ev = currentEvent(G), list = eventChoices(G), ch = G.today.choice, st = stormOn(G);
+  panel(10, 104, 630, 494, ev.kind === 'trouble' ? 'TROUBLE' : 'CHANCE');
+  let title = ev.def.title, line = ev.def.line;
+  if (ev.id === 'sick_crew') { const p = crewById(G, G.today.sickId); title = p.name + ' feels ill'; line = p.name + ' the ' + p.role + ' woke up ill.'; }
+  if (ev.id === 'solar_storm' && st.day > 0) title = 'Solar storm, day ' + (st.day + 1);
+  text((ev.kind === 'trouble' ? '! ' : '* ') + title, 24, 152, 22, '#fff', 'left', true);
+  text(line, 24, 176, 14, COL.text);
+  let y = 192;
+  if (ev.id === 'solar_storm') {
+    text('REAL EVENT · ' + st.date + ' · NASA DONKI' + (dayOf(G).storm.verified ? '' : ' · PLACEHOLDER DATA, NOT VERIFIED'), 24, y + 6, 12, COL.warn, 'left', true); y += 18;
+  }
+  if (ui.pick) {
+    const def = list.find(x => x.id === ui.pick.id), n = ui.pick.ids.length;
+    text(def.label, 24, y + 30, 17, '#fff', 'left', true);
+    text('Pick ' + def.pick.min + (def.pick.max > def.pick.min ? ' or ' + def.pick.max : '') + ' crew on the right. Their dose badge after the job is shown.', 24, y + 56, 13);
+    text('Picked: ' + (n ? ui.pick.ids.map(id => crewById(G, id).name).join(', ') : 'nobody yet'), 24, y + 80, 14, COL.warn);
+    button('pick-ok', 24, y + 100, 290, 50, 'Confirm', () => { const pk = ui.pick; setG(resolveEvent(G, pk.id, pk.ids)); }, { enabled: n >= def.pick.min, primary: true, bold: true });
+    button('pick-no', 330, y + 100, 290, 50, 'Cancel', () => { ui.pick = null; });
+    return;
+  }
+  if (!ch) {
+    list.forEach((o, i) => {
+      const sub = ['+ ' + o.plus, '− ' + o.minus];
+      if (!o.enabled) sub.push('(' + o.why + ')');
+      else if (o.dose !== null) sub.push(showMsv() ? 'Dose today: ' + fmt2(o.dose) + ' mSv each' : o.dose <= c.DOSE_INDOOR_PER_SOL + 0.01 ? 'Dose today: the minimum' : 'Dose today: more than usual');
+      else if (o.pick) sub.push('You pick who goes');
+      button('ch:' + o.id, 24, y + 14 + i * 98, 600, 88, o.label, () => {
+        if (o.pick) ui.pick = { id: o.id, ids: [] }; else setG(resolveEvent(G, o.id, []));
+      }, { enabled: o.enabled, sub });
+    });
+    button('back', 910, 610, 360, 100, '← Back to the plan', () => setG(backToPlan(G)), { size: 16 });
+    return;
+  }
+  text('You chose: ' + ch.label, 24, y + 36, 18, '#fff', 'left', true);
+  if (ch.crew.length) text('Crew: ' + ch.crew.map(id => crewById(G, id).name).join(', '), 24, y + 62, 14, COL.warn);
+  const o = list.find(x => x.id === ch.id);
+  if (o) { text('+ ' + o.plus, 24, y + 90, 14, COL.dim); text('− ' + o.minus, 24, y + 110, 14, COL.dim); }
+  const freeNow = cellsAvailable(G) - planTotal(G.plan);
+  if (freeNow > 0) text(plural(freeNow, 'free cell') + ' not shared yet. Go back to the plan.', 24, y + 140, 14, COL.warn, 'left', true);
+  button('change', 24, y + 170, 290, 44, 'Change choice', () => setG(clearChoice(G)));
+  button('back', 330, y + 170, 290, 44, '← Back to the plan', () => setG(backToPlan(G)));
+  button('go', 910, 610, 360, 100, 'PLAY THE SOL ▶', () => setG(playSol(G).state), { primary: true, size: 20, bold: true });
+}
+
+function drawResults() {
+  const c = cfg(G.mode), R = G.lastResults, b = G.today.before;
+  panel(10, 104, 630, 494, 'SOL ' + G.sol + ' RESULTS · what changed, and why');
+  text('Air & water ' + fmt(b.air) + '→' + fmt(G.air) + ' · Food ' + fmt(b.food) + '→' + fmt(G.food) + ' · Crop ' + fmt(b.crop) + '→' + fmt(G.crop), 24, 148, 15, '#fff', 'left', true);
+  const lh = Math.min(24, 420 / Math.max(1, R.length)), fs = lh >= 22 ? 14 : lh >= 18 ? 12 : 11;
+  R.forEach((r, i) => {
+    const y = 176 + i * lh, bad = /−|worse|hurt|tired|empty|lost|dark|medbay|Warning|failed|gone/.test(r.t), good = /\+|fixed|found|well|rested|leaves/.test(r.t);
+    text(r.t, 24, y, fs, good && !bad ? COL.good : bad ? COL.warn : COL.text, 'left', true);
+    text('← ' + r.why, 300, y, fs, COL.dim);
+  });
+  let label = 'SLEEP → SOL ' + (G.sol + 1) + ' ▶', note = radioOffReason(G);
+  if (G.over) { label = 'MISSION CONTROL CALLS ▶'; note = 'A tank stayed empty for ' + c.ZERO_SOLS_TO_LOSE + ' sols.'; }
+  else if (radioCanSend(G)) { label = 'EVENING CALL ▶'; note = ''; }
+  else if (G.sol >= c.MISSION_SOLS) label = 'THE SHIP LANDS ▶';
+  if (note) text(note, 910, 604, 12, COL.warn);
+  button('go', 910, 610, 360, 100, label, () => setG(proceed(G)), { primary: true, size: 20, bold: true });
+}
+
+function drawRadio() {
+  panel(10, 104, 630, 494, 'EVENING CALL · one message to Earth, answer at breakfast');
+  messageOptions(G).forEach((m, i) => {
+    const sub = ['+ ' + m.plus, '− ' + m.minus];
+    if (!m.enabled) sub.push('(' + m.why + ')');
+    button('msg:' + m.id, 24, 140 + i * 98, 600, 88, '"' + m.label + '"', () => setG(sendMessage(G, m.id)), { enabled: m.enabled, sub });
+  });
+  button('go', 910, 610, 360, 100, 'No message tonight ▶', () => setG(sendMessage(G, null)), { size: 16 });
+}
+
+function drawReport() {
+  const r = endMission(G), c = cfg(G.mode);
+  panel(10, 104, 1260, 606, 'CAPTAIN\'S REPORT · Mission ' + G.name + ' · ' + G.mode);
+  text(r.won ? 'THE SHIP LANDED. MISSION COMPLETE.' : 'MISSION CONTROL CALLED THE CREW HOME EARLY ON SOL ' + r.sol + '. EVERYONE IS SAFE.', 24, 156, 20, '#fff', 'left', true);
+  const starName = ['Crew home safe', 'Science done', 'Nobody in the medbay, all badges green'];
+  r.stars.forEach((on, i) => {
+    const y = 176 + i * 44;
+    rect(24, y, 30, 30, on ? COL.good : null, on ? COL.good : COL.dim, 2);
+    text(on ? '✓' : '', 39, y + 23, 22, '#111', 'center', true);
+    text('STAR ' + (i + 1) + ' · ' + starName[i], 66, y + 15, 15, on ? '#fff' : COL.dim, 'left', true);
+    text(on ? 'earned' : 'How to get it: ' + r.hints[i], 66, y + 31, 13, on ? COL.good : COL.warn);
+  });
+  const n = r.stars.filter(Boolean).length;
+  text('STARS EARNED: ' + n + ' / 3', 660, 196, 22, n ? '#fff' : COL.warn, 'left', true);
+  text(n === 0 ? 'No stars this time. Same Mars again: change one decision.' : n === 3 ? 'Perfect mission!' : plural(3 - n, 'star') + ' still to earn.', 660, 220, 13, COL.dim);
+  let y = 322;
+  if (!r.won) { text('THE DECISION THAT MATTERED MOST', 24, y, 13, COL.dim, 'left', true); y = wrap(r.mattered, 24, y + 20, 600, 14, COL.warn, 18) + 12; }
+  text('RADIATION DOSE OVER ' + r.sol + ' SOLS (millisievert, mSv = a unit for radiation dose)', 24, y, 13, COL.dim, 'left', true); y += 20;
+  for (const d of r.doses) {
+    text(d.name, 24, y, 14, '#fff', 'left', true); text(d.role, 90, y, 13, COL.dim);
+    text(fmt2(d.dose) + ' mSv', 190, y, 14); text(d.badge.toUpperCase(), 290, y, 13, d.badge === 'green' ? COL.good : d.badge === 'amber' ? COL.warn : COL.bad, 'left', true);
+    text(plural(d.trips, 'trip') + ' outside · ' + plural(d.medbaySols, 'sol') + ' in medbay', 360, y, 13, COL.dim); y += 20;
+  }
+  text('The game speeds time up: 15 sols stand for a much longer stay.', 24, y + 4, 12, COL.dim);
+  text('SCIENCE SENT HOME: ' + r.science + ' / ' + r.target, 660, 322, 14, '#fff', 'left', true);
+  text('Cards found ' + r.found.length + ', sent ' + r.sent.length + ' · album ' + ui.album.length + ' of ' + CARDS.length, 660, 342, 13, COL.dim);
+  wrap(r.found.map(id => cardDef(id).title + (r.sent.includes(id) ? '' : ' (not sent)')).join(' · ') || 'no cards', 660, 362, 590, 12, COL.text, 16);
+  let ry = 430;
+  text('REAL NASA EVENTS IN YOUR MISSION', 660, ry, 13, COL.dim, 'left', true); ry += 20;
+  for (const e of r.real.slice(0, 5)) { text('Sol ' + e.sol + ' · ' + e.date + ' · ' + e.label + ' · ' + e.source + (e.verified ? '' : ' (placeholder)'), 660, ry, 12, COL.warn); ry += 18; }
+  if (!r.real.length) text('none reached', 660, ry, 12, COL.dim);
+  button('again', 24, 630, 400, 64, 'SAME MARS AGAIN ▶', () => { setG(createMission(G.name, G.mode)); }, { primary: true, size: 18, bold: true });
+  button('new', 440, 630, 300, 64, 'New mission', () => { G = null; ui.name = randomMissionName(); ui.focusId = 'name'; });
+}
+
+function drawHelper() {
+  const c = cfg(G.mode), key = G.sol + ':' + G.phase;
+  if (ui.helperKey !== key) { ui.helperKey = key; ui.helperOn = false; }
+  panel(10, 606, 890, 104, 'STATION HELPER · explains, never decides');
+  const on = c.HELPER_ALWAYS_ON || ui.helperOn;
+  if (on) text(line15(helperLine()), 24, 660, 17, '#fff');
+  else button('ask', 24, 640, 180, 40, 'Ask the helper', () => { ui.helperOn = true; });
+  button('why', 790, 640, 100, 40, 'Why?', () => { ui.overlay = { title: 'WHY? · how this step works', lines: whyText() }; });
+}
+
+function drawOverlay() {
+  const o = ui.overlay;
+  g.fillStyle = 'rgba(0,0,0,0.78)'; g.fillRect(0, 0, W, H);
+  rect(90, 40, 1100, 640, '#202020', '#fff', 2);
+  text(o.title, 114, 78, 18, '#fff', 'left', true);
+  let y = 110;
+  for (const l of o.lines) {
+    const col = l.indexOf('FAIL') === 0 ? COL.bad : l.indexOf('PASS') === 0 ? COL.good : COL.text;
+    y = wrap(l, 114, y, 1050, o.small ? 12 : 15, col, o.small ? 15 : 22) + (o.small ? 1 : 8);
+  }
+  text('click or press Enter to close', 114, 664, 12, COL.dim);
+}
+
+function debugLines() {
+  const lines = ['Seed "' + G.seed + '" · phase ' + G.phase + ' · air0 ' + G.counters.airZero + ' food0 ' + G.counters.foodZero + ' · labWork ' + G.labWork + ' · battery ' + G.battery];
+  for (const d of G.schedule) lines.push((d.sol === G.sol ? '> ' : '  ') + 'sol ' + d.sol + ' · ' + d.kind + (d.eventId ? ':' + d.eventId : '') + ' · ' + d.weather + (d.storm ? ' · STORM day ' + (d.storm.day + 1) : '') + (d.real.length ? ' · real: ' + d.real.map(e => e.date + ' ' + e.label).join('; ') : ''));
+  lines.push('Problems: ' + (JSON.stringify(G.problems) || '[]'));
+  lines.push('Crew: ' + G.crew.map(p => p.name + ' ' + fmt2(p.dose) + ' streak' + p.heavyStreak + (p.sick ? ' sick' + p.sickRest : '')).join(' | '));
+  return lines;
+}
+
+function render() {
+  ui.hits = [];
+  g.setTransform(ui.px, 0, 0, ui.px, 0, 0);
+  g.fillStyle = COL.bg; g.fillRect(0, 0, W, H);
+  if (!G) drawTitle();
+  else {
+    drawHUD();
+    if (G.phase === PHASE.REPORT) drawReport();
+    else {
+      ({ briefing: drawBriefing, plan: drawPlan, event: drawEvent, results: drawResults, radio: drawRadio })[G.phase]();
+      drawCrew(); drawHelper();
+    }
+  }
+  if (ui.overlay) { ui.hits = []; drawOverlay(); }
+}
+
+// --- ввод ---
+function resize() {
+  const k = Math.min(window.innerWidth / W, window.innerHeight / H), dpr = window.devicePixelRatio || 1;
+  cv.style.width = Math.floor(W * k) + 'px'; cv.style.height = Math.floor(H * k) + 'px';
+  ui.px = Math.max(0.5, k * dpr);
+  cv.width = Math.round(W * ui.px); cv.height = Math.round(H * ui.px);
+  render();
+}
+function toLocal(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height }; }
+function hitAt(p) { for (let i = ui.hits.length - 1; i >= 0; i--) { const h = ui.hits[i]; if (p.x >= h.x && p.x <= h.x + h.w && p.y >= h.y && p.y <= h.y + h.h) return h; } return null; }
+cv.addEventListener('pointerdown', e => {
+  if (ui.overlay) { ui.overlay = null; render(); return; }
+  const h = hitAt(toLocal(e));
+  if (h && h.en) { ui.focusId = h.id; h.fn(); } else if (!G) ui.focusId = null;
+  render();
+});
+cv.addEventListener('pointermove', e => { const h = hitAt(toLocal(e)), id = h && h.en ? h.id : null; if (id !== ui.hoverId) { ui.hoverId = id; cv.style.cursor = id ? 'pointer' : 'default'; render(); } });
+function autoPlaySol() { // бот доигрывает текущий сол до следующего утра
+  if (!G || G.phase === PHASE.REPORT) return;
+  let s = G, guard = 0; const sol = s.sol;
+  do { s = botStep(s, 'careful'); } while (s.phase !== PHASE.REPORT && !(s.phase === PHASE.BRIEFING && s.sol !== sol) && guard++ < 20);
+  setG(s);
+}
+window.addEventListener('keydown', e => {
+  const k = e.key;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (ui.overlay) { if (k === 'Escape' || k === 'Enter' || k === ' ') { ui.overlay = null; e.preventDefault(); render(); } return; }
+  if (!G && ui.focusId === 'name') {
+    if (k.length === 1 && /[a-zA-Z0-9 ]/.test(k)) { if (ui.name.length < 22) ui.name += k; e.preventDefault(); render(); return; }
+    if (k === 'Backspace') { ui.name = ui.name.slice(0, -1); e.preventDefault(); render(); return; }
+    if (k === 'Enter') { const h = ui.hits.find(x => x.id === 'launch'); if (h) h.fn(); e.preventDefault(); render(); return; }
+  }
+  const list = ui.hits.filter(h => h.en), idx = list.findIndex(h => h.id === ui.focusId);
+  if (k === 'Tab' || k === 'ArrowRight' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowUp') {
+    const back = (k === 'Tab' && e.shiftKey) || k === 'ArrowLeft' || k === 'ArrowUp';
+    if (list.length) ui.focusId = list[idx < 0 ? (back ? list.length - 1 : 0) : (idx + (back ? -1 : 1) + list.length) % list.length].id;
+    e.preventDefault(); render(); return;
+  }
+  if (k === 'Enter' || k === ' ') { const h = idx >= 0 ? list[idx] : list.find(x => x.primary); if (h) h.fn(); e.preventDefault(); render(); return; }
+  if (k === 'd' || k === 'D') { if (G && !ui.debug) { ui.debug = true; ui.overlay = { title: 'DEBUG · full schedule and hidden numbers (D again turns debug off)', lines: debugLines(), small: true }; } else ui.debug = false; render(); return; }
+  if (k === 't' || k === 'T') {
+    const res = selfTest(), fails = res.filter(r => !r.pass).length;
+    ui.overlay = { title: 'SELF-TEST · ' + (res.length - fails) + ' of ' + res.length + ' passed', lines: res.map(r => (r.pass ? 'PASS ' : 'FAIL ') + r.name + (r.detail ? '  [' + r.detail + ']' : '')), small: true };
+    render(); return;
+  }
+  if (k === 'a' || k === 'A') { autoPlaySol(); render(); return; }
+});
+window.addEventListener('resize', resize);
+
+// --- запуск ---
+ui.album = store.get('marsOutpost.album') || [];
+ui.hasSave = !!store.get('marsOutpost.save');
+window.MarsOutpost = {
+  CONFIG, MODE_OVERRIDES, PHASE, TRANSITIONS,
+  createMission, getMorning, startPlanning, applyPlan, confirmPlan, backToPlan, eventChoices, resolveEvent, clearChoice, playSol, previewSol, proceed, messageOptions, sendMessage, endMission,
+  runMission, selfTest, balanceReport, botStep,
+  get state() { return G; }, set state(s) { G = s; render(); }, render,
+};
+resize();
+cv.focus();
+</script>
+</body>
+</html>
