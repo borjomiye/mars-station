@@ -1,6 +1,6 @@
 // One sol = morning -> energy -> event -> evening. Pure functions: (state, decision) -> new state.
 // Owner: P1. The UI, the simulator and the tests all call only these functions.
-import type { Allocation, GameState, MessageCard } from './types';
+import type { Allocation, DonkiEvent, GameState, MessageCard } from './types';
 import { SYSTEMS } from './types';
 import { balance, findDonkiEvent, getEvent, getSite } from './content';
 import { applyEffect, applyPending, availableCrew, clamp, effectiveCells, isChoiceAvailable, say } from './effects';
@@ -9,6 +9,7 @@ import { deliverReply, send } from './comms';
 import { computeStars } from './scoring';
 
 const clone = (s: GameState): GameState => structuredClone(s);
+const MAX_DONKI_LINES = 2;
 
 function assertPhase(state: GameState, phase: GameState['phase']): void {
   if (state.phase !== phase) throw new Error(`Expected phase ${phase}, got ${state.phase}`);
@@ -41,9 +42,14 @@ export function startSol(prev: GameState): GameState {
   applyPending(s);
 
   // Real DONKI flares and plasma clouds are early warnings, not dose.
-  for (const id of s.schedule[s.sol - 1].donkiEventIds) {
-    const e = findDonkiEvent(id);
-    if (!e) continue;
+  // At most MAX_DONKI_LINES per morning, most important first (Mars-directed CME, X flare, ...).
+  const rank = (e: DonkiEvent) => (e.marsImpact ? 0 : e.classType?.startsWith('X') ? 1 : e.type === 'CME' ? 2 : 3);
+  const warnings = s.schedule[s.sol - 1].donkiEventIds
+    .map(findDonkiEvent)
+    .filter((e): e is DonkiEvent => e !== undefined && e.type !== 'SEP')
+    .sort((a, b) => rank(a) - rank(b))
+    .slice(0, MAX_DONKI_LINES);
+  for (const e of warnings) {
     if (e.type === 'FLR') say(s, { key: 'avatar.morning.flare', params: { flareClass: e.classType ?? '?', date: e.date }, mood: 'worried', sourceLink: e.link });
     if (e.type === 'CME') {
       say(s, { key: 'avatar.morning.cme', params: { speed: e.speed ?? '?', date: e.date }, mood: 'worried', sourceLink: e.link });
@@ -163,8 +169,11 @@ function endGame(s: GameState, result: 'failed' | 'survived', reasonKey: string)
 export function sendMessageAndSleep(prev: GameState, card: MessageCard | null): GameState {
   assertPhase(prev, 'evening');
   const s = clone(prev);
-  send(s, card);
+  const lost = send(s, card);
   if (s.sol >= s.totalSols) return endGame(s, 'survived', 'end.survived');
   s.sol += 1;
-  return startSol(s);
+  const next = startSol(s);
+  // Tell the player next morning (the UI shows lines of the current sol only).
+  if (lost) say(next, { key: 'reply.lost', mood: 'worried' });
+  return next;
 }

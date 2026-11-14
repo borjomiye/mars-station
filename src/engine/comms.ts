@@ -42,17 +42,15 @@ export function deliverReply(state: GameState): void {
   say(state, { key: out.replyKey ?? 'reply.forecast.calm', params: out.replyParams, mood: 'calm', termKey: 'term.delay' });
 }
 
-/** Evening: send one card (or nothing). A dust storm can block the radio. Mutates. */
-export function send(state: GameState, card: MessageCard | null): void {
-  if (!card || !availableCards(state).includes(card)) return;
+/** Evening: send one card (or nothing). A dust storm can block the radio. Mutates.
+ *  Returns true if the message was lost. */
+export function send(state: GameState, card: MessageCard | null): boolean {
+  if (!card || !availableCards(state).includes(card)) return false;
 
   if (state.station.dustSolsLeft > 0) {
     const [roll, next] = nextRandom(state.decisionRng);
     state.decisionRng = next;
-    if (roll < balance.comms.dustLossChance) {
-      say(state, { key: 'reply.lost', mood: 'worried' });
-      return;
-    }
+    if (roll < balance.comms.dustLossChance) return true;
   }
 
   if (card === 'science_report') {
@@ -63,4 +61,5 @@ export function send(state: GameState, card: MessageCard | null): void {
   } else {
     state.comms.outgoing = { card, sentSol: state.sol };
   }
+  return false;
 }
