@@ -1,22 +1,29 @@
+// The game, one 1280×720 screen at a time: title → morning → base (plan) → event → results → evening → … → report.
 import { useState } from 'react';
 import {
-  applyPlan, backToPlan, cards, clearChoice, confirmPlan, createMission, donki, eventChoices, playSol, proceed, randomMissionName, resolveEvent, sendMessage, startPlanning,
+  applyPlan, backToPlan, clearChoice, confirmPlan, createMission, eventChoices, playSol, proceed, randomMissionName, resolveEvent, sendMessage, startPlanning,
   type GameState, type Job, type Mode, type SystemId,
 } from '../engine';
 import { addToAlbum, loadAlbum, loadGame, saveGame } from './save';
-import { Crew, Helper, Hud } from './panels';
-import { BriefingScreen, DataScreen, EventScreen, PlanScreen, RadioScreen, ReportScreen, ResultsScreen } from './screens';
+import { Frame, Overlay } from './Frame';
+import { Hud } from './bits';
+import { withAutoJobs } from './autoJobs';
+import { MorningScreen } from './Morning';
+import { PlanBase, ResultsBase } from './Base';
+import { AlbumView, DataView, EventScreen, RadioScreen, ReportScreen, TitleScreen } from './Screens';
 
 type Picking = { id: string; ids: string[] };
+type Window = 'album' | 'data' | null;
 
 export default function App() {
   const [s, setState] = useState<GameState | null>(null);
   const [saved, setSaved] = useState<GameState | null>(() => loadGame());
   const [album, setAlbum] = useState<string[]>(() => loadAlbum());
   const [picking, setPicking] = useState<Picking | null>(null);
-  const [showData, setShowData] = useState(false);
+  const [win, setWin] = useState<Window>(null);
   const [name, setName] = useState(() => randomMissionName());
   const [mode, setMode] = useState<Mode>('cadet');
+  const [manual, setManual] = useState<{ sol: number; ids: string[] }>({ sol: 0, ids: [] }); // jobs the captain set by hand this sol
 
   /** Every engine step goes through here: save the mission, keep found cards in the album. */
   const set = (next: GameState) => {
@@ -27,93 +34,59 @@ export default function App() {
     setAlbum((a) => addToAlbum(a, next.cards.found));
   };
   const toMenu = () => { setPicking(null); setState(null); };
-
-  const header = (
-    <header className="row" style={{ justifyContent: 'space-between' }}>
-      <h1 style={{ margin: 0, color: 'var(--mars)' }}>Mars Outpost</h1>
-      <div className="row">
-        {s && <button className="secondary small" onClick={toMenu}>Menu</button>}
-        <button className="secondary small" onClick={() => setShowData((v) => !v)}>Where the data comes from</button>
-      </div>
-    </header>
+  const windows = (
+    <>
+      {win === 'album' && <Overlay title={`Discovery album · ${album.length} found`} onClose={() => setWin(null)} wide><AlbumView album={album} /></Overlay>}
+      {win === 'data' && <Overlay title="Where the data comes from" onClose={() => setWin(null)} wide><DataView periodId={s?.periodId} /></Overlay>}
+    </>
   );
 
-  if (showData) return <main className="app">{header}<DataScreen periodId={s?.periodId} onBack={() => setShowData(false)} /></main>;
-
+  let screen;
   if (!s) {
-    return (
-      <main className="app">
-        {header}
-        <section className="panel stack">
-          {donki.stub && <div className="warning">Placeholder space weather: replace with real DONKI data before the demo.</div>}
-          <p style={{ margin: 0 }}>You are the captain of a small station on Mars. Keep five people safe for 15 sols until the ship home lands.</p>
-          <label className="stack">
-            Mission name (same name = same Mars)
-            <span className="row">
-              <input value={name} maxLength={24} onChange={(e) => setName(e.target.value.replace(/[^a-zA-Z0-9 ]/g, ''))} aria-label="Mission name" />
-              <button className="secondary small" onClick={() => setName(randomMissionName())}>Random name</button>
-            </span>
-          </label>
-          <div className="row" role="group" aria-label="Mode">
-            <button className={mode === 'cadet' ? '' : 'secondary'} aria-pressed={mode === 'cadet'} onClick={() => setMode('cadet')}>Cadet · helper hints, gentler storms</button>
-            <button className={mode === 'commander' ? '' : 'secondary'} aria-pressed={mode === 'commander'} onClick={() => setMode('commander')}>Commander · real mSv, forecast by radio</button>
-          </div>
-          <div className="row">
-            <button onClick={() => set(createMission(name || 'Brave Otter', mode))}>Launch mission ▶</button>
-            {saved && <button className="secondary" onClick={() => setState(saved)}>Continue Mission {saved.name} (sol {saved.sol})</button>}
-          </div>
-        </section>
-        <section className="panel stack">
-          <strong>Discovery album · {album.length} of {cards.length} found</strong>
-          <ul className="lines album">
-            {cards.map((k) => <li key={k.id} className={album.includes(k.id) ? '' : 'muted'}>{album.includes(k.id) ? `■ ${k.title}` : `□ ??? · hint: ${k.hint}`}</li>)}
-          </ul>
-        </section>
-      </main>
+    screen = (
+      <TitleScreen
+        name={name} setName={setName} onRandom={() => setName(randomMissionName())} mode={mode} setMode={setMode}
+        onLaunch={() => set(createMission(name || 'Brave Otter', mode))} saved={saved} onContinue={() => saved && setState(saved)}
+        onAlbum={() => setWin('album')} onData={() => setWin('data')} albumCount={album.length}
+      />
+    );
+  } else if (s.phase === 'report') {
+    screen = <ReportScreen s={s} album={album} onAgain={() => set(createMission(s.name, s.mode))} onNew={() => { setName(randomMissionName()); toMenu(); }} />;
+  } else if (s.phase === 'briefing') {
+    screen = <MorningScreen key={s.sol} s={s} onNext={() => { setManual({ sol: s.sol, ids: [] }); set(withAutoJobs(startPlanning(s), [])); }} />;
+  } else {
+    const hand = manual.sol === s.sol ? manual.ids : [];
+    const setCells = (k: SystemId, delta: number) => set(withAutoJobs(applyPlan(s, { ...s.plan, cells: { ...s.plan.cells, [k]: s.plan.cells[k] + delta } }), hand));
+    const setJob = (crewId: string, job: Job) => {
+      setManual({ sol: s.sol, ids: hand.includes(crewId) ? hand : [...hand, crewId] });
+      set(applyPlan(s, { ...s.plan, jobs: { ...s.plan.jobs, [crewId]: job } }));
+    };
+    const choose = (id: string) => {
+      const def = eventChoices(s).find((x) => x.id === id);
+      if (def?.pick) setPicking({ id, ids: [] }); else set(resolveEvent(s, id));
+    };
+    const togglePick = (crewId: string) => {
+      const def = picking ? eventChoices(s).find((x) => x.id === picking.id) : undefined;
+      if (!picking || !def?.pick) return;
+      const has = picking.ids.includes(crewId);
+      setPicking({ id: picking.id, ids: has ? picking.ids.filter((x) => x !== crewId) : [...picking.ids, crewId].slice(-def.pick.max) });
+    };
+    screen = (
+      <div className="screen in-sol">
+        <Hud s={s} onMenu={toMenu} onData={() => setWin('data')} />
+        {s.phase === 'plan' && <PlanBase s={s} onCells={setCells} onJob={setJob} onDone={() => set(confirmPlan(s))} />}
+        {s.phase === 'results' && <ResultsBase s={s} onNext={() => set(proceed(s))} />}
+        {s.phase === 'event' && (
+          <EventScreen
+            s={s} picking={picking} onChoose={choose} onTogglePick={togglePick}
+            onPickConfirm={() => picking && set(resolveEvent(s, picking.id, picking.ids))} onPickCancel={() => setPicking(null)}
+            onChange={() => set(clearChoice(s))} onBack={() => set(backToPlan(s))} onPlay={() => set(playSol(s).state)}
+          />
+        )}
+        {s.phase === 'radio' && <RadioScreen s={s} onSend={(id) => set(sendMessage(s, id))} />}
+      </div>
     );
   }
 
-  if (s.phase === 'report') {
-    return (
-      <main className="app">
-        {header}
-        <Hud s={s} />
-        <ReportScreen s={s} album={album} onAgain={() => set(createMission(s.name, s.mode))} onNew={() => { setName(randomMissionName()); toMenu(); }} />
-      </main>
-    );
-  }
-
-  const setCells = (k: SystemId, delta: number) => set(applyPlan(s, { ...s.plan, cells: { ...s.plan.cells, [k]: s.plan.cells[k] + delta } }));
-  const setJob = (crewId: string, job: Job) => set(applyPlan(s, { ...s.plan, jobs: { ...s.plan.jobs, [crewId]: job } }));
-  const choose = (id: string) => {
-    const def = eventChoices(s).find((x) => x.id === id);
-    if (def?.pick) setPicking({ id, ids: [] }); else set(resolveEvent(s, id));
-  };
-  const pickDef = picking ? eventChoices(s).find((x) => x.id === picking.id) : undefined;
-  const togglePick = (crewId: string) => {
-    if (!picking || !pickDef?.pick) return;
-    const max = pickDef.pick.max, has = picking.ids.includes(crewId);
-    const ids = has ? picking.ids.filter((x) => x !== crewId) : [...picking.ids, crewId].slice(-max);
-    setPicking({ id: picking.id, ids });
-  };
-
-  return (
-    <main className="app">
-      {header}
-      <Hud s={s} />
-      {s.phase === 'briefing' && <BriefingScreen s={s} onPlan={() => set(startPlanning(s))} />}
-      {s.phase === 'plan' && <PlanScreen s={s} onCells={setCells} onDone={() => set(confirmPlan(s))} />}
-      {s.phase === 'event' && (
-        <EventScreen
-          s={s} picking={picking} onChoose={choose}
-          onPickConfirm={() => picking && set(resolveEvent(s, picking.id, picking.ids))} onPickCancel={() => setPicking(null)}
-          onChange={() => set(clearChoice(s))} onBack={() => set(backToPlan(s))} onPlay={() => set(playSol(s).state)}
-        />
-      )}
-      {s.phase === 'results' && <ResultsScreen s={s} onNext={() => set(proceed(s))} />}
-      {s.phase === 'radio' && <RadioScreen s={s} onSend={(id) => set(sendMessage(s, id))} />}
-      <Crew s={s} onJob={s.phase === 'plan' ? setJob : undefined} pick={picking && pickDef?.pick ? { spec: pickDef.pick, ids: picking.ids, onToggle: togglePick } : undefined} />
-      <Helper s={s} picking={!!picking} />
-    </main>
-  );
+  return <Frame>{screen}{windows}</Frame>;
 }

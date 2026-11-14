@@ -1,0 +1,125 @@
+// Small pieces shared by the screens: top bar, crew card, dose badge, robot mood, morning report lines.
+import {
+  badgeOf, cellsAvailable, cfg, effectiveJobs, energyOf, fmt, fmt2, getMorning, isBlackout, plural, stormOn, today,
+  type Badge, type CrewMember, type GameState, type RealEvent,
+} from '../engine';
+import { crewArt, icon } from './art';
+
+// ---------- top bar ----------
+
+function Meter({ img, label, value, max, color }: { img: string; label: string; value: number; max: number; color: string }) {
+  return (
+    <div className="hud-meter" title={`${label}: ${fmt(value)} of ${max}`}>
+      <img src={img} alt="" />
+      <div className="hud-meter-body">
+        <div className="hud-meter-label"><span>{label}</span><b>{fmt(value)}/{max}</b></div>
+        <div className="bar" role="meter" aria-label={label} aria-valuenow={value} aria-valuemin={0} aria-valuemax={max}>
+          <div style={{ width: `${Math.min(100, (100 * value) / max)}%`, background: color }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function Hud({ s, onMenu, onData }: { s: GameState; onMenu: () => void; onData: () => void }) {
+  const c = cfg(s.mode), day = today(s), st = stormOn(s);
+  const sky = day.weather === 'dust' ? 'weather-dust' : day.weather === 'hazy' ? 'weather-clearing' : 'weather-clear';
+  return (
+    <header className="hud" aria-label="Station status">
+      <div className="hud-sol">
+        <img src={icon('sol')} alt="" />
+        <div><b>Sol {s.sol} / {c.MISSION_SOLS}</b><span>Mission {s.name}</span></div>
+      </div>
+      <div className="hud-sky" title={`Sky: ${day.weather}`}>
+        <span className="sky-frame"><img src={icon(sky)} alt="" /></span>
+        <div><b>{day.weather}</b><span><img src={icon('cell')} alt="" />{cellsAvailable(s)} cells</span></div>
+      </div>
+      <Meter img={icon('air')} label="Air & water" value={s.air} max={c.TANK_MAX} color="var(--life)" />
+      <Meter img={icon('food')} label="Food" value={s.food} max={c.TANK_MAX} color="var(--food)" />
+      <Meter img={icon('science')} label="Science" value={s.science} max={c.SCIENCE_TARGET} color="var(--science)" />
+      <div className="hud-flags">
+        {st && <span className="flag alert" title="Solar storm today"><img src={icon('flare')} alt="" />storm ×{st.mult}</span>}
+        {isBlackout(s) && <span className="flag alert"><img src={icon('radio')} alt="" />blackout</span>}
+        <span className="flag" title="The ship home"><img src={icon('ship-home')} alt="" />{Math.max(0, c.MISSION_SOLS - s.sol)} sols</span>
+      </div>
+      <div className="hud-buttons">
+        <button className="secondary small" onClick={onData} aria-label="Where the data comes from">i</button>
+        <button className="secondary small" onClick={onMenu}>Menu</button>
+      </div>
+    </header>
+  );
+}
+
+// ---------- crew ----------
+
+export const badgeIcon = (b: Badge) => icon(`badge-${b}`);
+
+export function crewState(p: CrewMember): { key: string | null; text: string } {
+  if (p.medbay > 0) return { key: 'sick', text: `In the medbay · ${plural(Math.ceil(p.medbay), 'sol')} left` };
+  if (p.sick) return { key: 'sick', text: 'Ill · must rest' };
+  if (p.cond === 'tired') return { key: 'tired', text: 'Tired · works at half power' };
+  return { key: null, text: 'Fine' };
+}
+
+/** Who this person is and how they are: shown on hover and when picked. */
+export function CrewCard({ s, p }: { s: GameState; p: CrewMember }) {
+  const c = cfg(s.mode), b = badgeOf(c, p.dose), st = crewState(p), energy = energyOf(c, p), job = effectiveJobs(s)[p.id] ?? 'rest';
+  const max = c.BADGE_RED_MSV * 1.1;
+  return (
+    <div className="crew-card">
+      <div className="crew-card-head">
+        <span className="portrait"><img src={crewArt(p.id, 'portrait')} alt="" className={`role-${p.role}`} /></span>
+        <div><b>{p.name}</b><span className="muted">{p.role} · best at {c.SPECIALIST_OF[p.role]}</span></div>
+      </div>
+      <div className={`crew-card-state${st.key ? ' alert' : ''}`}>{st.key && <img src={icon(st.key)} alt="" />}{st.text}{p.grounded ? ' · stays inside' : ''}</div>
+      <div className="crew-card-row"><span>Energy</span>
+        <div className="bar" role="meter" aria-label={`${p.name} energy`} aria-valuenow={Math.round(energy * 100)} aria-valuemin={0} aria-valuemax={100}>
+          <div style={{ width: `${energy * 100}%`, background: energy > 0.5 ? 'var(--food)' : 'var(--energy)' }} />
+        </div>
+      </div>
+      <div className={`crew-card-row badge ${b}`}><img src={badgeIcon(b)} alt="" />
+        <div className="bar" role="meter" aria-label={`Dose badge: ${b}`} aria-valuenow={p.dose} aria-valuemin={0} aria-valuemax={c.BADGE_RED_MSV}>
+          <div style={{ width: `${Math.min(100, (100 * p.dose) / max)}%` }} />
+        </div>
+        <span>{b}{c.SHOW_MSV ? ` · ${fmt2(p.dose)} mSv` : ''}</span>
+      </div>
+      <div className="crew-card-row"><span>Today</span><b>{job}</b></div>
+    </div>
+  );
+}
+
+// ---------- robot ----------
+
+export function helperMood(s: GameState): 'alert' | 'worried' | 'happy' | 'thinking' | 'calm' {
+  if (stormOn(s) || s.counters.airZero || s.counters.foodZero || s.problems.some((p) => p.severity > 1)) return 'alert';
+  if (s.problems.length || s.crew.some((p) => p.medbay > 0 || p.sick || p.cond === 'tired')) return 'worried';
+  if (s.phase === 'results') { const last = s.log[s.log.length - 1]; return last && last.harvests > 0 ? 'happy' : 'calm'; }
+  if (s.phase === 'plan' || s.phase === 'event') return 'thinking';
+  return s.phase === 'radio' ? 'happy' : 'calm';
+}
+
+// ---------- morning report ----------
+
+export type Beat = { kind: 'say' | 'alert' | 'earth' | 'good' | 'word' | 'real' | 'today' | 'forecast'; text: string; real?: RealEvent; small?: string };
+
+export function beatsOf(s: GameState): Beat[] {
+  const m = getMorning(s), out: Beat[] = [];
+  for (const a of m.answers) out.push({ kind: 'earth', text: `Earth: ${a}` });
+  for (const l of m.lines) out.push({ kind: 'say', text: l });
+  for (const l of m.notes) out.push({ kind: 'alert', text: l });
+  if (m.storm) out.push({ kind: 'alert', text: `Solar storm today: dose x${m.storm.mult} unless the shield is fully powered.` });
+  if (m.blackout) out.push({ kind: 'alert', text: 'Radio blackout today: the Sun is between Mars and Earth.' });
+  if (m.unlocked.length) out.push({ kind: 'good', text: `New today: ${m.unlocked.join(', ')}!` });
+  for (const w of m.words) out.push({ kind: 'word', text: `New word · ${w}` });
+  for (const e of m.real) out.push({ kind: 'real', text: `Real event · ${e.date} · ${e.label}`, real: e });
+  out.push({ kind: 'today', text: `Today: ${m.weather} sky · ${m.cells} energy cells`, small: m.cellNotes.join(', ') });
+  for (const f of m.forecast) out.push({ kind: 'forecast', text: `Forecast sol ${f.sol}: ${f.weather}, ${f.cells} cells${f.storm ? `, solar storm x${f.storm}` : ', no storm'}` });
+  return out;
+}
+
+export function BeatLine({ b, text, caret, linkTab }: { b: Beat; text?: string; caret?: boolean; linkTab?: number }) {
+  if (b.kind === 'real' && b.real) {
+    return <p className="beat real"><b>{b.text}</b> <span className="source">{b.real.note}. <a href={b.real.link} target="_blank" rel="noreferrer" tabIndex={linkTab}>NASA DONKI</a></span></p>;
+  }
+  return <p className={`beat ${b.kind}`}>{text ?? b.text}{caret && <span className="caret" />}{b.small && !caret && <span className="muted"> ({b.small})</span>}</p>;
+}
