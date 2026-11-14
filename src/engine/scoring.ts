@@ -1,4 +1,4 @@
-// Stars, the Captain's report and "the one decision that mattered most".
+import { t } from './text';
 import type { GameState, MissionReport, RealEvent } from './types';
 import { cardDef, cfg } from './content';
 import { badgeOf, fmt, plural } from './rules';
@@ -20,16 +20,16 @@ export function matteredMost(s: GameState): string {
         if (!best || cur.b - cur.a > best.b - best.a) best = { ...cur };
       } else run = null;
     }
-    if (best) return 'The greenhouse had ' + (best.zero ? 'no' : 'too little') + ' power on sol' + (best.a === best.b ? ' ' + best.a : 's ' + best.a + '–' + best.b) + '.';
-    return 'Only ' + plural(s.counters.harvests, 'harvest') + ' came in. More hands in the greenhouse would help.';
+    if (best) return t(`report.greenhouse${best.zero ? 'No' : 'Low'}Power${best.a === best.b ? 'OneSol' : 'Sols'}`, { from: best.a, to: best.b });
+    return t('report.onlyCameInMoreHands', { harvests: plural(s.counters.harvests, 'harvest') });
   }
   const sums: Record<string, { lost: number; sols: number }> = {};
   for (const r of s.log) for (const a of r.air) if (a.d < 0) { const k = sums[a.key] || (sums[a.key] = { lost: 0, sols: 0 }); k.lost -= a.d; k.sols++; }
   const top = Object.keys(sums).sort((a, b) => sums[b].lost - sums[a].lost)[0];
-  if (!top) return 'Air & water ran out.';
-  const tail = ' (−' + fmt(sums[top].lost) + ' air & water).';
-  if (top === 'life') return 'Life support was short of power on ' + plural(sums[top].sols, 'sol') + tail;
-  return 'The ' + c.PROBLEMS[top].name.toLowerCase() + ' leaked for ' + plural(sums[top].sols, 'sol') + tail + ' Fix it early.';
+  if (!top) return t('report.airWaterRanOut');
+  const tail = t('report.airWater', { lost: fmt(sums[top].lost) });
+  if (top === 'life') return t('report.lifeSupportWasShortOf', { sols: plural(sums[top].sols, 'sol'), tail });
+  return t('report.theLeakedForFixIt', { problem: c.PROBLEMS[top].name.toLowerCase(), sols: plural(sums[top].sols, 'sol'), tail });
 }
 
 export function endMission(s: GameState): MissionReport {
@@ -42,14 +42,14 @@ export function endMission(s: GameState): MissionReport {
   if (!stars[1]) {
     const unsent = s.cards.found.filter((id) => !s.cards.sent.includes(id));
     const pot = s.science + unsent.reduce((a, id) => a + c.SCIENCE_PER_CARD[cardDef(id).kind], 0);
-    hints[1] = pot >= c.SCIENCE_TARGET ? plural(unsent.length, 'card') + ' never went home. Send the science report.'
-      : 'Only ' + plural(s.cards.found.length, 'card') + ' found. Take chances and power the lab.';
+    hints[1] = pot >= c.SCIENCE_TARGET ? t('report.neverWentHomeSendThe', { cards: plural(unsent.length, 'card') })
+      : t('report.onlyFoundTakeChancesAnd', { cards: plural(s.cards.found.length, 'card') });
   }
   if (!stars[2]) {
     const m = s.crew.find((p) => p.medbaySols > 0), i = badges.findIndex((b) => b !== 'green');
-    if (!won) hints[2] = 'Reach sol ' + c.MISSION_SOLS + ' first.';
-    else if (m && c.THIRD_STAR_RULE !== 'green') hints[2] = m.name + ' spent ' + plural(m.medbaySols, 'sol') + ' in the medbay after ' + m.medbayCause + '.';
-    else if (i >= 0) hints[2] = s.crew[i].name + "'s badge turned " + badges[i] + ': ' + plural(s.crew[i].trips, 'trip') + ' outside' + (s.crew[i].stormExtra > 0.01 ? ' and storm dose.' : '.');
+    if (!won) hints[2] = t('report.reachSolFirst', { missionSols: c.MISSION_SOLS });
+    else if (m && c.THIRD_STAR_RULE !== 'green') hints[2] = t('report.spentInTheMedbayAfter', { name: m.name, medbaysols: plural(m.medbaySols, 'sol'), medbaycause: m.medbayCause });
+    else if (i >= 0) hints[2] = t('report.sBadgeTurnedOutside', { name: s.crew[i].name, value: badges[i], trips: plural(s.crew[i].trips, 'trip'), dose: (s.crew[i].stormExtra > 0.01 ? t('report.andStormDose') : '.') });
   }
   const real: (RealEvent & { sol: number })[] = [];
   for (const d of s.schedule) if (d.sol <= s.sol) for (const e of d.real) real.push({ sol: d.sol, ...e });
