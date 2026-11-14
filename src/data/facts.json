@@ -1,0 +1,5 @@
+{
+  "stub": true,
+  "_note": "Owner: P4. 10-15 real health facts from NASA OSDR (https://osdr.nasa.gov). Each needs textKey (in en.json), study title and link. Do not invent facts.",
+  "facts": []
+}

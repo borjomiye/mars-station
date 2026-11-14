@@ -1,0 +1,29 @@
+{
+  "stub": true,
+  "generatedAt": "STUB",
+  "source": "PLACEHOLDER. Replace with real data: npm run fetch:donki (needs NASA_API_KEY in .env).",
+  "periods": [
+    {
+      "id": "stub-stormy",
+      "start": "2000-01-01",
+      "days": 15,
+      "kind": "stormy",
+      "events": [
+        { "id": "STUB-FLR-1", "type": "FLR", "date": "2000-01-03", "classType": "M1.0", "link": "https://kauai.ccmc.gsfc.nasa.gov/DONKI/" },
+        { "id": "STUB-SEP-1", "type": "SEP", "date": "2000-01-05", "link": "https://kauai.ccmc.gsfc.nasa.gov/DONKI/" },
+        { "id": "STUB-CME-1", "type": "CME", "date": "2000-01-09", "speed": 900, "marsImpact": false, "link": "https://kauai.ccmc.gsfc.nasa.gov/DONKI/" },
+        { "id": "STUB-FLR-2", "type": "FLR", "date": "2000-01-09", "classType": "X1.0", "link": "https://kauai.ccmc.gsfc.nasa.gov/DONKI/" },
+        { "id": "STUB-SEP-2", "type": "SEP", "date": "2000-01-11", "link": "https://kauai.ccmc.gsfc.nasa.gov/DONKI/" }
+      ]
+    },
+    {
+      "id": "stub-calm",
+      "start": "2000-02-01",
+      "days": 15,
+      "kind": "calm",
+      "events": [
+        { "id": "STUB-FLR-3", "type": "FLR", "date": "2000-02-07", "classType": "C5.0", "link": "https://kauai.ccmc.gsfc.nasa.gov/DONKI/" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "stub": true,
+  "_note": "PLACEHOLDER. Owner: P4. Fill from NASA RadLab (ISS daily dose) with a link, for the ISS vs Mars comparison.",
+  "issDailyDoseMSv": null,
+  "source": "https://www.nasa.gov/ (RadLab link TBD)"
+}
