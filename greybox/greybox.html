@@ -125,7 +125,7 @@ const CONFIG = {
 };
 // Отличия режимов (раздел 7): один движок, два файла баланса.
 const MODE_OVERRIDES = {
-  cadet:     { AIR_START: 10, FOOD_START: 9, STORM_MULT_BY_DAY: [2, 1.5], AUTO_FORECAST_SOLS: 1, HELPER_ALWAYS_ON: true, SHOW_MSV: false },
+  cadet:     { AIR_START: 8, FOOD_START: 8, STORM_MULT_BY_DAY: [2, 1.5], AUTO_FORECAST_SOLS: 1, HELPER_ALWAYS_ON: true, SHOW_MSV: false },
   commander: {},
 };
 
@@ -986,30 +986,37 @@ function endMission(s) {
 }
 
 /* ============================== 4. BOT + SELF-TEST ============================== */
+// Вероятности ошибок «невнимательного» бота (на каждое решение). Крутите, чтобы сдвинуть сложность.
+const BOT = { SLOPPY: { lifeShort: 0.2, forgetShield: 0.5, ignoreTired: 0.5, ignoreSick: 0.4, stormTrip: 0.3, skipRepair: 0.35, skipChoice: 0.4, skipMessage: 0.4 } };
 function botPlan(s, style) {
   const c = cfg(s.mode), day = dayOf(s), cells = { life: 0, shield: 0, greenhouse: 0, radio: 0, lab: 0 }, jobs = {};
   let left = cellsAvailable(s);
   const give = (k, n) => { if (!isUnlocked(s, k)) return; const g = Math.max(0, Math.min(n, left, c.SYSTEMS[k].max - cells[k])); cells[k] += g; left -= g; };
   if (style === 'lazy') { give('shield', 3); give('lab', 2); give('radio', 1); for (const p of s.crew) jobs[p.id] = 'rest'; return { cells, jobs }; }
-  give('life', c.SYSTEMS.life.want);
-  if (day.storm) give('shield', c.SYSTEMS.shield.want);
+  // «Невнимательный» игрок: те же правила, но по-детски путает приоритеты. Случайность своя, от сида миссии и сола.
+  const sl = style === 'sloppy', rr = makeRng(s.seed + ':' + s.sol + ':plan');
+  give('life', sl && rr() < BOT.SLOPPY.lifeShort ? c.SYSTEMS.life.want - 1 : c.SYSTEMS.life.want);
+  if (day.storm && !(sl && rr() < BOT.SLOPPY.forgetShield)) give('shield', c.SYSTEMS.shield.want);
   give('greenhouse', s.food <= 5 ? 3 : 2);
   if (!isBlackout(s) && !radioBlocked(s)) give('radio', 1);
   if (left >= c.SYSTEMS.lab.want && s.sol >= c.SYSTEMS.lab.unlockSol) give('lab', c.SYSTEMS.lab.want);
   give('greenhouse', 3);
   if (s.air < c.TANK_MAX - 1) give('life', 1);
-  give('shield', 3);
+  if (!sl) give('shield', 3);
   const inside = s.problems.some(p => c.PROBLEMS[p.type].where === 'inside'), outside = s.problems.some(p => c.PROBLEMS[p.type].where === 'outside');
   const ill = s.crew.some(p => p.medbay > 0 || p.sick);
   for (const p of s.crew) {
     let j = 'grow';
-    const fit = p.cond !== 'tired' && !p.sick, canOut = fit && !p.grounded && !day.storm;
-    const safeTrip = p.dose + c.DOSE_INDOOR_PER_SOL * (c.MISSION_SOLS - s.sol + 1) + c.DOSE_OUTSIDE_TRIP < c.BADGE_AMBER_MSV;
+    // невнимательный: иногда не замечает усталость и болезнь
+    const fit = (p.cond !== 'tired' || (sl && rr() < BOT.SLOPPY.ignoreTired)) && (!p.sick || (sl && rr() < BOT.SLOPPY.ignoreSick));
+    const canOut = fit && !p.grounded && (!day.storm || (sl && rr() < BOT.SLOPPY.stormTrip));
+    const safeTrip = sl || p.dose + c.DOSE_INDOOR_PER_SOL * (c.MISSION_SOLS - s.sol + 1) + c.DOSE_OUTSIDE_TRIP < c.BADGE_AMBER_MSV;
+    const skipFix = sl && rr() < BOT.SLOPPY.skipRepair;
     if (!fit) j = 'rest';
-    else if (p.role === 'engineer') j = inside ? 'fix' : outside && canOut ? 'outside' : 'grow';
+    else if (p.role === 'engineer') j = inside && !skipFix ? 'fix' : outside && canOut && !skipFix ? 'outside' : 'grow';
     else if (p.role === 'medic') j = ill ? 'care' : 'grow';
     else if (p.role === 'scientist') j = cells.lab >= c.SYSTEMS.lab.want && s.samples >= 1 ? 'lab' : 'grow';
-    else if (p.role === 'pilot') j = canOut && safeTrip && p.heavyStreak < 1 && s.sol >= c.SYSTEMS.lab.unlockSol ? 'outside' : 'grow';
+    else if (p.role === 'pilot') j = canOut && safeTrip && (sl || p.heavyStreak < 1) && s.sol >= c.SYSTEMS.lab.unlockSol ? 'outside' : 'grow';
     jobs[p.id] = j;
   }
   return { cells, jobs };
@@ -1017,7 +1024,8 @@ function botPlan(s, style) {
 function botChoice(s, style) {
   const c = cfg(s.mode), ev = currentEvent(s), list = eventChoices(s).filter(x => x.enabled);
   const lastId = () => { const l = list.filter(x => !x.pick); return [l[l.length - 1].id, []]; };
-  if (style !== 'careful') return lastId();
+  if (style === 'lazy') return lastId();
+  if (style === 'sloppy' && makeRng(s.seed + ':' + s.sol + ':choice')() < BOT.SLOPPY.skipChoice) return lastId(); // «потом разберусь»
   const has = id => list.some(x => x.id === id);
   const fit = s.crew.filter(p => p.medbay <= 0 && !p.sick && p.cond !== 'tired');
   const fixers = fit.slice().sort((a, b) => workPower(c, b, 'fix') - workPower(c, a, 'fix'));
@@ -1036,7 +1044,9 @@ function botChoice(s, style) {
   return lastId();
 }
 function botMessage(s, style) {
-  if (style !== 'careful') return null;
+  if (style === 'lazy') return null;
+  if (style === 'sloppy' && makeRng(s.seed + ':' + s.sol + ':msg')() < BOT.SLOPPY.skipMessage) return null; // забыл про радио
+
   const c = cfg(s.mode), o = messageOptions(s), en = id => o.find(m => m.id === id).enabled;
   const unsent = s.cards.found.filter(id => !s.cards.sent.includes(id)).length;
   if (en('science') && (unsent >= 2 || s.sol >= c.MISSION_SOLS - 2)) return 'science';
@@ -1063,19 +1073,20 @@ function runMission(seed, mode, style, hook) {
   while (s.phase !== PHASE.REPORT && guard++ < 400) { s = botStep(s, style || 'careful'); if (hook) hook(s); }
   return s;
 }
-function balanceReport(n) {
+// Прогон ботов: для каждого режима и стиля — сколько миссий закончилось 0/1/2/3 звёздами и средние показатели.
+function balanceReport(n, styles) {
   n = n || 40; const out = {};
-  for (const mode of ['cadet', 'commander']) {
-    const a = { missions: n, star1: 0, star2: 0, star3: 0, avgScience: 0, avgMinAir: 0, avgMinFood: 0, avgMaxDose: 0 };
+  for (const style of styles || ['careful', 'sloppy', 'lazy']) for (const mode of ['cadet', 'commander']) {
+    const a = { missions: n, starsDistribution: { '0': 0, '1': 0, '2': 0, '3': 0 }, reachedShip: 0, avgScience: 0, avgMinAir: 0, avgMinFood: 0, avgMaxDose: 0, avgMedbaySols: 0 };
     for (let i = 0; i < n; i++) {
       let minAir = 99, minFood = 99;
-      const s = runMission('balance ' + i, mode, 'careful', t => { minAir = Math.min(minAir, t.air); minFood = Math.min(minFood, t.food); });
-      const r = endMission(s);
-      a.star1 += r.stars[0] ? 1 : 0; a.star2 += r.stars[1] ? 1 : 0; a.star3 += r.stars[2] ? 1 : 0;
-      a.avgScience += r.science / n; a.avgMinAir += minAir / n; a.avgMinFood += minFood / n; a.avgMaxDose += Math.max.apply(null, s.crew.map(p => p.dose)) / n;
+      const s = runMission('balance ' + i, mode, style, t => { minAir = Math.min(minAir, t.air); minFood = Math.min(minFood, t.food); });
+      const r = endMission(s), cnt = r.stars.filter(Boolean).length;
+      a.starsDistribution[cnt]++; a.reachedShip += r.won ? 1 : 0;
+      a.avgScience += r.science / n; a.avgMinAir += minAir / n; a.avgMinFood += minFood / n; a.avgMaxDose += Math.max.apply(null, s.crew.map(p => p.dose)) / n; a.avgMedbaySols += s.counters.medbaySols / n;
     }
-    for (const k of ['avgScience', 'avgMinAir', 'avgMinFood', 'avgMaxDose']) a[k] = Math.round(a[k] * 100) / 100;
-    out[mode] = a;
+    for (const k of ['avgScience', 'avgMinAir', 'avgMinFood', 'avgMaxDose', 'avgMedbaySols']) a[k] = Math.round(a[k] * 100) / 100;
+    out[style + ' / ' + mode] = a;
   }
   return out;
 }
@@ -1400,6 +1411,11 @@ function drawCrew() {
     text(p.name, 704, y + 18, 16, '#fff', 'left', true); text(p.role, 760, y + 18, 12, COL.dim);
     const cond = p.medbay > 0 ? 'MEDBAY: ' + plural(Math.ceil(p.medbay), 'sol') + ' left' : p.sick ? 'ILL: must rest' : p.cond === 'tired' ? 'TIRED: half effect' : 'fine';
     text(cond + (p.grounded ? ' · stays inside' : ''), 704, y + 36, 12, cond === 'fine' ? COL.dim : COL.warn);
+    // полоска сил: полная = свежий, половина = один тяжёлый сол подряд, пустая = устал / болен / в медотсеке
+    const energy = p.medbay > 0 || p.sick || p.cond === 'tired' ? 0 : 1 - p.heavyStreak / c.HEAVY_SOLS_TO_TIRED;
+    text('ENERGY', 900, y + 38, 10, COL.dim);
+    rect(940, y + 30, 70, 8, '#111', COL.line);
+    rect(941, y + 31, 68 * clamp(energy, 0, 1), 6, energy > 0.5 ? COL.good : energy > 0 ? COL.warn : COL.bad, null);
     drawBadge(900, y + 4, p, c);
     if (pickDef) { // выбор экипажа для события: превью значка «до → после»
       const okP = p.medbay <= 0 && !(pickDef.pick.job === 'outside' && p.grounded), on = ui.pick.ids.includes(p.id);

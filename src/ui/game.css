@@ -1,0 +1,40 @@
+/* Layout for the game screens. Colours come only from the variables in theme.css (owner: P6). */
+h2 { margin: 0; font-size: 22px; }
+h3 { margin: 8px 0 0; font-size: 18px; }
+input { font: inherit; padding: 10px; min-height: 48px; width: 240px; border-radius: var(--radius); border: 1px solid var(--muted); background: var(--panel-2); color: var(--text); }
+button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid var(--energy); outline-offset: 2px; }
+button[aria-pressed='true'] { outline: 2px solid var(--text); }
+
+.alert { color: var(--energy); }
+.good { color: var(--food); }
+.lines { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.lines.results { font-size: 16px; }
+.lines.album { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); list-style: none; padding-left: 0; font-size: 16px; }
+.real { border-left: 3px solid var(--energy); padding-left: 10px; }
+
+.track { display: flex; gap: 3px; list-style: none; margin: 0; padding: 0; flex-wrap: wrap; }
+.track li { width: 24px; height: 24px; display: grid; place-items: center; font-size: 12px; border: 1px solid var(--muted); border-radius: 4px; }
+.track li.past { background: var(--panel-2); color: var(--text); }
+.track li.cur { background: var(--text); color: var(--bg); font-weight: 700; }
+
+.crew { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.crew-card { display: grid; gap: 6px; }
+.face { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 2px solid var(--text); border-radius: 50%; font-weight: 700; }
+.energy, .badge { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; font-size: 14px; }
+.energy { grid-template-columns: auto 1fr; }
+.badge .bar { position: relative; }
+.badge .bar i { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--text); }
+.badge.green { color: var(--food); }
+.badge.green .bar > div { background: var(--food); }
+.badge.amber { color: var(--energy); }
+.badge.amber .bar > div { background: var(--energy); }
+.badge.red { color: var(--danger); }
+.badge.red .bar > div { background: var(--danger); }
+.jobs { display: flex; gap: 6px; flex-wrap: wrap; }
+.jobs button { min-height: 44px; }
+
+.cell.bonus { outline: 1px dashed var(--muted); }
+button.choice { display: grid; gap: 2px; text-align: left; justify-items: start; }
+button.choice span { color: var(--muted); font-size: 16px; }
+table { border-collapse: collapse; font-size: 16px; }
+th, td { text-align: left; padding: 2px 12px 2px 0; }
