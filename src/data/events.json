@@ -1,0 +1,117 @@
+{
+  "_note": "Event deck. Every choice MUST have a cost (tests check it). Owner: P5 (game design).",
+  "events": [
+    {
+      "id": "radiation_storm",
+      "titleKey": "event.radiation_storm.title",
+      "descKey": "event.radiation_storm.desc",
+      "weight": 0,
+      "trigger": "SEP",
+      "termKey": "term.sep",
+      "choices": [
+        {
+          "id": "shelter",
+          "labelKey": "event.radiation_storm.shelter",
+          "outcomeKey": "event.radiation_storm.shelter.outcome",
+          "effects": [{ "kind": "shelter" }]
+        },
+        {
+          "id": "keep_working",
+          "labelKey": "event.radiation_storm.keep_working",
+          "outcomeKey": "event.radiation_storm.keep_working.outcome",
+          "effects": [{ "kind": "science", "delta": 1 }, { "kind": "eva", "count": 1 }]
+        }
+      ]
+    },
+    {
+      "id": "quiet_sol",
+      "titleKey": "event.quiet_sol.title",
+      "descKey": "event.quiet_sol.desc",
+      "weight": 5,
+      "termKey": "term.sol",
+      "choices": [
+        {
+          "id": "eva_samples",
+          "labelKey": "event.quiet_sol.eva_samples",
+          "outcomeKey": "event.quiet_sol.eva_samples.outcome",
+          "effects": [{ "kind": "science", "delta": 2 }, { "kind": "eva", "count": 2 }]
+        },
+        {
+          "id": "lab_work",
+          "labelKey": "event.quiet_sol.lab_work",
+          "outcomeKey": "event.quiet_sol.lab_work.outcome",
+          "effects": [{ "kind": "science", "delta": 1 }, { "kind": "busy", "count": 1, "sols": 1 }, { "kind": "energyNextSol", "delta": -1 }]
+        }
+      ]
+    },
+    {
+      "id": "dust_storm",
+      "titleKey": "event.dust_storm.title",
+      "descKey": "event.dust_storm.desc",
+      "weight": 2,
+      "choices": [
+        {
+          "id": "brush_panels",
+          "labelKey": "event.dust_storm.brush_panels",
+          "outcomeKey": "event.dust_storm.brush_panels.outcome",
+          "effects": [{ "kind": "dust", "sols": 1 }, { "kind": "eva", "count": 1 }]
+        },
+        {
+          "id": "wait_inside",
+          "labelKey": "event.dust_storm.wait_inside",
+          "outcomeKey": "event.dust_storm.wait_inside.outcome",
+          "effects": [{ "kind": "dust", "sols": 3 }]
+        }
+      ]
+    },
+    {
+      "id": "hull_damage",
+      "titleKey": "event.hull_damage.title",
+      "descKey": "event.hull_damage.desc",
+      "weight": 2,
+      "choices": [
+        {
+          "id": "fix_now",
+          "labelKey": "event.hull_damage.fix_now",
+          "outcomeKey": "event.hull_damage.fix_now.outcome",
+          "effects": [{ "kind": "eva", "count": 2 }]
+        },
+        {
+          "id": "fix_tomorrow",
+          "labelKey": "event.hull_damage.fix_tomorrow",
+          "outcomeKey": "event.hull_damage.fix_tomorrow.outcome",
+          "effects": [
+            { "kind": "lifeSupport", "delta": -8 },
+            { "kind": "schedule", "inSols": 1, "effect": { "kind": "eva", "count": 2 }, "reasonKey": "pending.hull_repair" }
+          ]
+        },
+        {
+          "id": "ignore",
+          "labelKey": "event.hull_damage.ignore",
+          "outcomeKey": "event.hull_damage.ignore.outcome",
+          "effects": [{ "kind": "hull", "delta": -40 }]
+        }
+      ]
+    },
+    {
+      "id": "system_failure",
+      "titleKey": "event.system_failure.title",
+      "descKey": "event.system_failure.desc",
+      "weight": 2,
+      "choices": [
+        {
+          "id": "repair_now",
+          "labelKey": "event.system_failure.repair_now",
+          "outcomeKey": "event.system_failure.repair_now.outcome",
+          "effects": [{ "kind": "busy", "count": 2, "sols": 1 }, { "kind": "energyNextSol", "delta": -1 }]
+        },
+        {
+          "id": "live_with_it",
+          "labelKey": "event.system_failure.live_with_it",
+          "outcomeKey": "event.system_failure.live_with_it.outcome",
+          "effects": [{ "kind": "systemBroken", "system": "greenhouse", "sols": 4 }]
+        }
+      ]
+    }
+  ]
+}

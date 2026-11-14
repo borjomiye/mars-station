@@ -1,0 +1,14 @@
+{
+  "_note": "Should-scope: more sites later. Owner: P4. Images from Mars Trek go to src/assets with credit.",
+  "sites": [
+    {
+      "id": "jezero",
+      "nameKey": "site.jezero",
+      "lat": 18.38,
+      "lon": 77.58,
+      "solarMult": 1.0,
+      "doseMult": 1.0,
+      "hasIce": false
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "_note": "All game numbers. Draft values: tune with `npm run simulate` and playtests. Owner: P5 (game design).",
+  "totalSols": 15,
+  "start": { "lifeSupport": 80, "food": 60, "hull": 100, "crewHealth": 100 },
+  "energy": { "baseCells": 10, "dustMult": 0.5, "maxCells": 12 },
+  "lifeSupport": { "perCell": 6, "perCrewPerSol": 4, "leakPerHullPoint": 0.25, "lowThreshold": 25, "lowHealthPenalty": 10 },
+  "food": { "perCell": 5, "perCrewPerSol": 2, "starvingHealthPenalty": 10 },
+  "shielding": { "perCell": 0.15, "max": 0.75 },
+  "comms": { "minCells": 1, "dustLossChance": 0.3, "forecastFromSol": 2, "forecastToSol": 3 },
+  "brokenSystemMult": 0.5,
+  "radiation": {
+    "_source": "Background: Curiosity RAD, Hassler et al., Science 2014 (doi:10.1126/science.1244797), ~0.64 mSv/day on the surface. VERIFY before demo. sepDoseMult is a game value.",
+    "backgroundMSvPerSol": 0.64,
+    "sepDoseMult": 20,
+    "evaMult": 1.5,
+    "shelterExposure": 0.25,
+    "stormHealthDamage": 60,
+    "doseLimitFor3Stars": 25
+  },
+  "health": { "dailyRecovery": 2, "medbayHealPerSol": 20, "medbayExitHealth": 70 },
+  "science": { "goal": 6 }
+}
