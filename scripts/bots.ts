@@ -53,6 +53,18 @@ export const bots: Bot[] = [
     message: (s) => (availableCards(s).includes('science_report') ? 'science_report' : null),
   },
   {
+    // Isolates the shielding decision: zero cells in shielding, but always uses the shelter.
+    // If this bot gets 3 stars often, the shield system has no teeth (balance task).
+    name: 'shelter-no-shield',
+    allocate: (s) => fill(s.resources.energy, [['lifeSupport', 4], ['comms', 1], ['greenhouse', 99]]),
+    choose: (s, ev) => firstAvailable(s, ev, ['shelter', 'fix_now', 'repair_now', 'brush_panels', 'eva_samples', 'lab_work']),
+    message: (s) => {
+      const cards = availableCards(s);
+      if (cards.includes('science_report') && (s.science.collected >= 2 || s.sol >= s.totalSols - 1)) return 'science_report';
+      return cards.includes('forecast') ? 'forecast' : null;
+    },
+  },
+  {
     name: 'sensible',
     allocate: (s) =>
       stormExpected(s)

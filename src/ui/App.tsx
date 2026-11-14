@@ -18,7 +18,15 @@ export default function App() {
   const [showData, setShowData] = useState(false);
   const [seedInput, setSeedInput] = useState('');
 
-  useEffect(() => saveGame(s), [s]);
+  // Save while a mission is running. The save is cleared only on an explicit restart,
+  // never on page load (s is null then).
+  useEffect(() => {
+    if (s) saveGame(s);
+  }, [s]);
+  const restart = () => {
+    saveGame(null);
+    setS(null);
+  };
 
   const start = () => {
     const seed = Number(seedInput) || randomSeed();
@@ -85,7 +93,7 @@ export default function App() {
       {s.phase === 'ended' && (
         <>
           <Avatar lines={linesOf(['event', 'evening'])} />
-          <EndScreen s={s} onRestart={() => setS(null)} />
+          <EndScreen s={s} onRestart={restart} />
         </>
       )}
       <p className="muted" style={{ fontSize: 14 }}>{t('ui.seed')}: {s.seed}</p>

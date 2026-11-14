@@ -7,7 +7,8 @@ export function EndScreen({ s, onRestart }: { s: GameState; onRestart: () => voi
     .filter((p) => p.sol <= s.sol)
     .flatMap((p) => p.donkiEventIds)
     .map((id) => content.findDonkiEvent(id))
-    .filter((e) => e !== undefined);
+    .filter((e) => e !== undefined)
+    .slice(0, 12);
   return (
     <section className="panel stack">
       <h2 style={{ margin: 0 }}>{t(o.reasonKey)}</h2>
