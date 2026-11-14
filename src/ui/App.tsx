@@ -1,102 +1,119 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
-  allocateEnergy, beginEnergy, content, newGame, randomSeed, resolveEvent, sendMessageAndSleep, type GameState,
+  applyPlan, backToPlan, cards, clearChoice, confirmPlan, createMission, donki, eventChoices, playSol, proceed, randomMissionName, resolveEvent, sendMessage, startPlanning,
+  type GameState, type Job, type Mode, type SystemId,
 } from '../engine';
-import { t } from './i18n';
-import { loadGame, saveGame } from './save';
-import { Hud } from './Hud';
-import { Avatar } from './Avatar';
-import { EnergyScreen } from './screens/EnergyScreen';
-import { EventScreen } from './screens/EventScreen';
-import { EveningScreen } from './screens/EveningScreen';
-import { EndScreen } from './screens/EndScreen';
-import { DataScreen } from './screens/DataScreen';
+import { addToAlbum, loadAlbum, loadGame, saveGame } from './save';
+import { Crew, Helper, Hud } from './panels';
+import { BriefingScreen, DataScreen, EventScreen, PlanScreen, RadioScreen, ReportScreen, ResultsScreen } from './screens';
+
+type Picking = { id: string; ids: string[] };
 
 export default function App() {
-  const [s, setS] = useState<GameState | null>(null);
-  const [saved] = useState<GameState | null>(() => loadGame());
+  const [s, setState] = useState<GameState | null>(null);
+  const [saved, setSaved] = useState<GameState | null>(() => loadGame());
+  const [album, setAlbum] = useState<string[]>(() => loadAlbum());
+  const [picking, setPicking] = useState<Picking | null>(null);
   const [showData, setShowData] = useState(false);
-  const [seedInput, setSeedInput] = useState('');
+  const [name, setName] = useState(() => randomMissionName());
+  const [mode, setMode] = useState<Mode>('cadet');
 
-  // Save while a mission is running. The save is cleared only on an explicit restart,
-  // never on page load (s is null then).
-  useEffect(() => {
-    if (s) saveGame(s);
-  }, [s]);
-  const restart = () => {
-    saveGame(null);
-    setS(null);
+  /** Every engine step goes through here: save the mission, keep found cards in the album. */
+  const set = (next: GameState) => {
+    setPicking(null);
+    setState(next);
+    saveGame(next);
+    setSaved(next.phase === 'report' ? null : next);
+    setAlbum((a) => addToAlbum(a, next.cards.found));
   };
-
-  const start = () => {
-    const seed = Number(seedInput) || randomSeed();
-    setS(newGame(seed));
-  };
+  const toMenu = () => { setPicking(null); setState(null); };
 
   const header = (
     <header className="row" style={{ justifyContent: 'space-between' }}>
-      <h1 style={{ margin: 0, color: 'var(--mars)' }}>{t('ui.title')}</h1>
-      <button className="secondary small" onClick={() => setShowData((v) => !v)}>{t('ui.dataSources')}</button>
+      <h1 style={{ margin: 0, color: 'var(--mars)' }}>Mars Outpost</h1>
+      <div className="row">
+        {s && <button className="secondary small" onClick={toMenu}>Menu</button>}
+        <button className="secondary small" onClick={() => setShowData((v) => !v)}>Where the data comes from</button>
+      </div>
     </header>
   );
 
-  if (showData) {
-    return (
-      <main className="app">
-        {header}
-        <DataScreen periodId={s?.periodId} onBack={() => setShowData(false)} />
-      </main>
-    );
-  }
+  if (showData) return <main className="app">{header}<DataScreen periodId={s?.periodId} onBack={() => setShowData(false)} /></main>;
 
   if (!s) {
     return (
       <main className="app">
         {header}
         <section className="panel stack">
-          {content.donki.stub && <div className="warning">{t('ui.stubWarning')}</div>}
-          <p style={{ margin: 0 }}>{t('ui.subtitle')}</p>
-          <label className="row">
-            {t('ui.seed')}
-            <input inputMode="numeric" value={seedInput} onChange={(e) => setSeedInput(e.target.value.replace(/\D/g, ''))} style={{ font: 'inherit', padding: 8, width: 140 }} />
+          {donki.stub && <div className="warning">Placeholder space weather: replace with real DONKI data before the demo.</div>}
+          <p style={{ margin: 0 }}>You are the captain of a small station on Mars. Keep five people safe for 15 sols until the ship home lands.</p>
+          <label className="stack">
+            Mission name (same name = same Mars)
+            <span className="row">
+              <input value={name} maxLength={24} onChange={(e) => setName(e.target.value.replace(/[^a-zA-Z0-9 ]/g, ''))} aria-label="Mission name" />
+              <button className="secondary small" onClick={() => setName(randomMissionName())}>Random name</button>
+            </span>
           </label>
-          <div className="row">
-            <button onClick={start}>{t('ui.newMission')}</button>
-            {saved && saved.phase !== 'ended' && <button className="secondary" onClick={() => setS(saved)}>{t('ui.continue')}</button>}
+          <div className="row" role="group" aria-label="Mode">
+            <button className={mode === 'cadet' ? '' : 'secondary'} aria-pressed={mode === 'cadet'} onClick={() => setMode('cadet')}>Cadet · helper hints, gentler storms</button>
+            <button className={mode === 'commander' ? '' : 'secondary'} aria-pressed={mode === 'commander'} onClick={() => setMode('commander')}>Commander · real mSv, forecast by radio</button>
           </div>
+          <div className="row">
+            <button onClick={() => set(createMission(name || 'Brave Otter', mode))}>Launch mission ▶</button>
+            {saved && <button className="secondary" onClick={() => setState(saved)}>Continue Mission {saved.name} (sol {saved.sol})</button>}
+          </div>
+        </section>
+        <section className="panel stack">
+          <strong>Discovery album · {album.length} of {cards.length} found</strong>
+          <ul className="lines album">
+            {cards.map((k) => <li key={k.id} className={album.includes(k.id) ? '' : 'muted'}>{album.includes(k.id) ? `■ ${k.title}` : `□ ??? · hint: ${k.hint}`}</li>)}
+          </ul>
         </section>
       </main>
     );
   }
 
-  const ev = s.activeEventId ? content.getEvent(s.activeEventId) : undefined;
-  const linesOf = (phases: string[]) => s.log.filter((l) => l.sol === s.sol && phases.includes(l.phase) && l.key !== ev?.titleKey);
+  if (s.phase === 'report') {
+    return (
+      <main className="app">
+        {header}
+        <Hud s={s} />
+        <ReportScreen s={s} album={album} onAgain={() => set(createMission(s.name, s.mode))} onNew={() => { setName(randomMissionName()); toMenu(); }} />
+      </main>
+    );
+  }
+
+  const setCells = (k: SystemId, delta: number) => set(applyPlan(s, { ...s.plan, cells: { ...s.plan.cells, [k]: s.plan.cells[k] + delta } }));
+  const setJob = (crewId: string, job: Job) => set(applyPlan(s, { ...s.plan, jobs: { ...s.plan.jobs, [crewId]: job } }));
+  const choose = (id: string) => {
+    const def = eventChoices(s).find((x) => x.id === id);
+    if (def?.pick) setPicking({ id, ids: [] }); else set(resolveEvent(s, id));
+  };
+  const pickDef = picking ? eventChoices(s).find((x) => x.id === picking.id) : undefined;
+  const togglePick = (crewId: string) => {
+    if (!picking || !pickDef?.pick) return;
+    const max = pickDef.pick.max, has = picking.ids.includes(crewId);
+    const ids = has ? picking.ids.filter((x) => x !== crewId) : [...picking.ids, crewId].slice(-max);
+    setPicking({ id: picking.id, ids });
+  };
 
   return (
     <main className="app">
       {header}
       <Hud s={s} />
-      {s.phase === 'morning' && (
-        <>
-          <Avatar lines={linesOf(['morning'])} />
-          <button onClick={() => setS(beginEnergy(s))}>{t('ui.toEnergy')}</button>
-        </>
+      {s.phase === 'briefing' && <BriefingScreen s={s} onPlan={() => set(startPlanning(s))} />}
+      {s.phase === 'plan' && <PlanScreen s={s} onCells={setCells} onDone={() => set(confirmPlan(s))} />}
+      {s.phase === 'event' && (
+        <EventScreen
+          s={s} picking={picking} onChoose={choose}
+          onPickConfirm={() => picking && set(resolveEvent(s, picking.id, picking.ids))} onPickCancel={() => setPicking(null)}
+          onChange={() => set(clearChoice(s))} onBack={() => set(backToPlan(s))} onPlay={() => set(playSol(s).state)}
+        />
       )}
-      {s.phase === 'energy' && <EnergyScreen s={s} onConfirm={(a) => setS(allocateEnergy(s, a))} />}
-      {s.phase === 'event' && <EventScreen s={s} onChoose={(id) => setS(resolveEvent(s, id))} />}
-      {s.phase === 'evening' && (
-        <>
-          <Avatar lines={linesOf(['event', 'evening'])} />
-          <EveningScreen key={s.sol} s={s} onSleep={(card) => setS(sendMessageAndSleep(s, card))} />
-        </>
-      )}
-      {s.phase === 'ended' && (
-        <>
-          <Avatar lines={linesOf(['event', 'evening'])} />
-          <EndScreen s={s} onRestart={restart} />
-        </>
-      )}
-      <p className="muted" style={{ fontSize: 14 }}>{t('ui.seed')}: {s.seed}</p>
+      {s.phase === 'results' && <ResultsScreen s={s} onNext={() => set(proceed(s))} />}
+      {s.phase === 'radio' && <RadioScreen s={s} onSend={(id) => set(sendMessage(s, id))} />}
+      <Crew s={s} onJob={s.phase === 'plan' ? setJob : undefined} pick={picking && pickDef?.pick ? { spec: pickDef.pick, ids: picking.ids, onToggle: togglePick } : undefined} />
+      <Helper s={s} picking={!!picking} />
     </main>
   );
 }

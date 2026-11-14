@@ -1,0 +1,101 @@
+{
+  "_note": "Discovery album. Titles and unlock hints only: real NASA photos, facts and source links still have to be added (P4).",
+  "cards": [
+    {
+      "id": "layered_rock",
+      "title": "Layered rock",
+      "kind": "chance",
+      "hint": "Look at a strange rock"
+    },
+    {
+      "id": "blue_sunset",
+      "title": "Blue sunset",
+      "kind": "chance",
+      "hint": "Watch a clear sunset"
+    },
+    {
+      "id": "morning_frost",
+      "title": "Morning frost",
+      "kind": "chance",
+      "hint": "Catch the frost at dawn"
+    },
+    {
+      "id": "dust_devil",
+      "title": "Dust devil",
+      "kind": "chance",
+      "hint": "Follow a whirlwind"
+    },
+    {
+      "id": "lab_1",
+      "title": "Lab find 1",
+      "kind": "lab",
+      "hint": "Power the lab"
+    },
+    {
+      "id": "lab_2",
+      "title": "Lab find 2",
+      "kind": "lab",
+      "hint": "Study a second sample"
+    },
+    {
+      "id": "lab_3",
+      "title": "Lab find 3",
+      "kind": "lab",
+      "hint": "Study a third sample"
+    },
+    {
+      "id": "lab_4",
+      "title": "Lab find 4",
+      "kind": "lab",
+      "hint": "Study a fourth sample"
+    },
+    {
+      "id": "lab_5",
+      "title": "Lab find 5",
+      "kind": "lab",
+      "hint": "Study a fifth sample"
+    },
+    {
+      "id": "lab_6",
+      "title": "Lab find 6",
+      "kind": "lab",
+      "hint": "Study a sixth sample"
+    },
+    {
+      "id": "space_radishes",
+      "title": "Space radishes",
+      "kind": "milestone",
+      "hint": "Bring in a harvest"
+    },
+    {
+      "id": "storm_survived",
+      "title": "Storm watcher",
+      "kind": "milestone",
+      "hint": "Survive a storm"
+    },
+    {
+      "id": "first_call",
+      "title": "Hello, Earth",
+      "kind": "milestone",
+      "hint": "Send a radio message"
+    },
+    {
+      "id": "bones",
+      "title": "Bones in space",
+      "kind": "milestone",
+      "hint": "Ask the doctors"
+    },
+    {
+      "id": "dust_survived",
+      "title": "Dust storm",
+      "kind": "milestone",
+      "hint": "Sit out a dust storm"
+    },
+    {
+      "id": "conjunction",
+      "title": "Sun in the way",
+      "kind": "milestone",
+      "hint": "Live through the radio blackout"
+    }
+  ]
+}

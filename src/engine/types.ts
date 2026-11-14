@@ -1,13 +1,20 @@
-// THE CONTRACT. Only the engine owner (P1) changes this file.
-// Every other part of the game (UI, data, scripts, tests) builds on these types.
+// THE CONTRACT. Every other part of the game (UI, data, scripts, tests) builds on these types.
+// Rewritten for the greybox mechanics (5 systems, crew jobs, dose badges, problems, radio, album).
 
-export type SystemId = 'lifeSupport' | 'shielding' | 'greenhouse' | 'comms';
-export const SYSTEMS: SystemId[] = ['lifeSupport', 'shielding', 'greenhouse', 'comms'];
-export type Allocation = Record<SystemId, number>;
-
-export type Phase = 'morning' | 'energy' | 'event' | 'evening' | 'ended';
+export type Mode = 'cadet' | 'commander';
+export type SystemId = 'life' | 'shield' | 'greenhouse' | 'radio' | 'lab';
+export const SYSTEMS: SystemId[] = ['life', 'shield', 'greenhouse', 'radio', 'lab'];
+export type Job = 'grow' | 'fix' | 'outside' | 'lab' | 'care' | 'rest';
+export const JOBS: Job[] = ['grow', 'fix', 'outside', 'lab', 'care', 'rest'];
+/** What a person really does today, after the medbay and the event choice are applied. */
+export type EffectiveJob = Job | 'medbay' | 'shelter' | 'scan' | 'rewire' | 'idle';
 export type Role = 'engineer' | 'medic' | 'botanist' | 'scientist' | 'pilot';
-export type Mood = 'calm' | 'worried' | 'happy';
+export type Phase = 'briefing' | 'plan' | 'event' | 'results' | 'radio' | 'report';
+export type Weather = 'clear' | 'hazy' | 'dust';
+export type DayKind = 'intro' | 'quiet' | 'trouble' | 'chance' | 'ship';
+export type CardKind = 'chance' | 'lab' | 'milestone';
+export type Badge = 'green' | 'amber' | 'red';
+export type BotStyle = 'careful' | 'sloppy' | 'lazy';
 
 // ---------- Data files (src/data/*.json) ----------
 
@@ -39,120 +46,103 @@ export type DonkiFile = {
   periods: DonkiPeriod[];
 };
 
-export type Site = {
-  id: string;
-  nameKey: string;
-  lat: number;
-  lon: number;
-  solarMult: number;     // multiplies base solar energy
-  doseMult: number;      // < 1 for low plains (more atmosphere overhead)
-  hasIce: boolean;
-  image?: string;
-  imageCredit?: string;
+export type SystemDef = { name: string; want: number; max: number; unlockSol: number };
+export type ProblemDef = {
+  name: string; where: 'inside' | 'outside'; work: number; airLeak: number; growEvery: number; maxSeverity: number; airOnFix: number;
+  growthFactor?: number[]; blocksRadio?: boolean; cellsLost?: number;
 };
-
-export type Fact = { id: string; textKey: string; study: string; link: string };
-
-// Effects are data: events.json describes choices only through these.
-export type Effect =
-  | { kind: 'lifeSupport'; delta: number }
-  | { kind: 'food'; delta: number }
-  | { kind: 'hull'; delta: number }
-  | { kind: 'crewHealth'; delta: number }           // every active crew member
-  | { kind: 'science'; delta: number }              // collected (not yet sent)
-  | { kind: 'energyNextSol'; delta: number }
-  | { kind: 'eva'; count: number }                  // N crew go outside today: extra dose, busy today
-  | { kind: 'busy'; count: number; sols: number }   // N crew busy inside (not in greenhouse)
-  | { kind: 'shelter' }                             // whole crew hides in the storm shelter today
-  | { kind: 'dust'; sols: number }                  // dust storm: less solar power for N sols
-  | { kind: 'systemBroken'; system: SystemId; sols: number } // works at half power
-  | { kind: 'schedule'; inSols: number; effect: Effect; reasonKey: string };
-
-export type Choice = {
-  id: string;
-  labelKey: string;      // button text
-  outcomeKey: string;    // what the avatar says after the choice
-  effects: Effect[];
-};
-
-export type EventDef = {
-  id: string;
-  titleKey: string;
-  descKey: string;
-  weight: number;        // chance in the random deck; 0 = never drawn randomly
-  trigger?: 'SEP';       // drawn only on days with a real DONKI SEP
-  termKey?: string;      // term to explain the first time this event appears
-  choices: Choice[];
-};
+export type TroubleDef = { title: string; line: string; problem?: string };
+export type ChanceDef = { title: string; line: string; card: string | null };
+export type CardDef = { id: string; title: string; kind: CardKind; hint: string };
+export type CrewDef = { id: string; name: string; role: Role };
 
 // ---------- Game state ----------
 
-export type MessageCard = 'forecast' | 'science_report';
+/** A real DONKI record shown to the player, with its date and source link. */
+export type RealEvent = { id: string; type: DonkiEventType; date: string; label: string; note: string; link: string };
+export type Storm = { day: number; date: string; link: string };
 
-export type Message = {
-  card: MessageCard;
-  sentSol: number;
-  replyKey?: string;
-  replyParams?: Record<string, string | number>;
+export type Day = {
+  sol: number;
+  kind: DayKind;
+  eventId: string | null;
+  weather: Weather;
+  storm: Storm | null;     // solar particle storm (from a real DONKI SEP)
+  real: RealEvent[];       // real DONKI records of this day, most important first
+  sickIdx: number;         // pre-rolled: who feels ill if the event is sick_crew
 };
 
 export type CrewMember = {
   id: string;
-  nameKey: string;
-  role: Role;            // label only in the hackathon version (no role bonuses)
-  health: number;        // 0..100
-  doseMSv: number;       // accumulated dose
-  status: 'active' | 'medbay';
-  busyUntilSol?: number; // busy (repair, lab, EVA) up to and including this sol
-  outsideToday?: boolean;
+  name: string;
+  role: Role;
+  cond: 'fine' | 'tired';
+  sick: boolean;
+  sickRest: number;
+  medbay: number;          // healing steps left; 0 = not in the medbay
+  medbaySols: number;
+  medbayCause: string;
+  dose: number;            // mSv, only grows
+  stormExtra: number;      // dose above normal taken in storms
+  trips: number;
+  heavyStreak: number;
+  grounded: boolean;       // red badge: stays inside
 };
 
-export type SolPlan = {
-  sol: number;
-  eventId: string;
-  donkiEventIds: string[]; // real DONKI events on this day of the period
+export type Problem = { uid: number; type: string; severity: number; done: number; age: number; advice: number; fixed?: boolean; by?: string[] };
+export type Plan = { cells: Record<SystemId, number>; jobs: Record<string, Job> };
+export type PickSpec = { job: EffectiveJob; task: string; min: number; max: number };
+export type Choice = { id: string; label: string; plus: string; minus: string; pick: PickSpec | null; enabled: boolean; why: string; dose: number | null };
+export type ChosenChoice = { id: string; crew: string[]; job: EffectiveJob | null; task: string | null; label: string };
+export type ResultLine = { t: string; why: string };
+export type SolRecord = {
+  sol: number; supply: number; cells: Record<SystemId, number>; jobs: Record<string, EffectiveJob>;
+  air: { d: number; key: string }[]; harvests: number; choice: string | null;
 };
-
-export type ScheduledEffect = { sol: number; effect: Effect; reasonKey: string };
-
-export type LogEntry = {
-  sol: number;
-  phase: Phase;
-  key: string;           // en.json key
-  params?: Record<string, string | number>;
-  mood: Mood;
-  termKey?: string;      // explain this term (first time only)
-  sourceLink?: string;   // NASA source shown next to the line
-};
+export type Morning = { lines: string[]; notes: string[]; answers: string[]; unlocked: string[]; words: string[] };
+export type RadioMessageId = 'forecast' | 'fix' | 'doctors' | 'science';
+export type MessageOption = { id: RadioMessageId; label: string; plus: string; minus: string; enabled: boolean; why: string };
+export type Forecast = { sol: number; weather: Weather; cells: number; storm: number | null };
+export type GameEvent = { kind: 'trouble' | 'chance'; id: string; title: string; line: string; problem?: string; card?: string | null };
 
 export type GameState = {
   version: number;
-  seed: number;
-  decisionRng: number;   // state of the second RNG (outcomes that depend on choices)
+  name: string;            // "Brave Otter": shown to the player
+  seed: string;            // normalised name; same seed = same Mars
+  mode: Mode;
+  periodId: string;        // real DONKI period this mission lives through
   sol: number;
-  totalSols: number;
   phase: Phase;
-  siteId: string;
-  periodId: string;
-  schedule: SolPlan[];
-  resources: { energy: number; lifeSupport: number; food: number };
-  allocation: Allocation;
-  energyModifier: number;  // applied to the next sol's energy, then reset
-  station: { hull: number; dustSolsLeft: number; broken: Partial<Record<SystemId, number>> };
+  air: number;
+  food: number;
+  crop: number;
+  samples: number;
+  labWork: number;
+  science: number;
   crew: CrewMember[];
-  science: { collected: number; sent: number };
-  comms: {
-    outgoing?: Message;    // sent this or a previous evening, waiting for a reply
-    incoming?: Message;    // the reply that arrived this evening
-    forecast: { sol: number; type: DonkiEventType }[]; // what Earth told us is coming
-    blackout: boolean;
-  };
-  todayExposure: number;   // 1 = normal, shelter lowers it
-  activeEventId?: string;
-  lastChoiceId?: string;
-  pending: ScheduledEffect[];
-  medbayVisits: number;
-  seenTerms: string[];
-  log: LogEntry[];
-  outcome?: { result: 'failed' | 'survived'; reasonKey: string; stars: 0 | 1 | 2 | 3 };
+  problems: Problem[];
+  uid: number;
+  schedule: Day[];
+  supply: number;
+  supplyNotes: string[];
+  battery: number;
+  panelBoost: { cells: number; until: number } | null;
+  plan: Plan;
+  today: { revealed: boolean; choice: ChosenChoice | null; sickId: string | null; skipEvent: boolean; before: { air: number; food: number; crop: number; science: number } | null };
+  radio: { queue: { id: RadioMessageId; sol: number }[]; sent: number };
+  known: number[];         // sols the player has a forecast for
+  cards: { found: string[]; sent: string[] };
+  morning: Morning;
+  lastResults: ResultLine[];
+  log: SolRecord[];
+  seenWords: string[];
+  flags: { panelsCovered: boolean; prefill: string | null };
+  counters: { airZero: number; foodZero: number; harvests: number; medbaySols: number };
+  over: { won: boolean; why: 'ship' | 'air' | 'food' } | null;
+};
+
+export type MissionReport = {
+  won: boolean; why: string; sol: number; stars: [boolean, boolean, boolean]; starCount: number; hints: [string, string, string]; mattered: string;
+  doses: { name: string; role: Role; dose: number; badge: Badge; trips: number; medbaySols: number }[];
+  science: number; target: number; found: string[]; sent: string[]; real: (RealEvent & { sol: number })[];
 };

@@ -50,3 +50,14 @@ npm run fetch:donki  # реальные данные DONKI → src/data/donki-pe
 - Тексты для детей: короткие предложения, простые слова; термин объясняется при первом появлении (`termKey`).
 - Доступность: кнопки не меньше 44px, у шкал `aria-label`, контраст.
 - Цвета — только через CSS-переменные из `theme.css`.
+
+## Обновление: механика greybox (ноябрь 2026)
+
+Движок в `src/engine/` заменён механикой прототипа `greybox/`. Что изменилось относительно правил выше:
+
+- Фазы сола: `briefing → plan → event → results → radio → report`. Публичные функции: `createMission`, `startPlanning`, `applyPlan`, `confirmPlan`, `resolveEvent`, `playSol`, `proceed`, `sendMessage`, `endMission` (все в `src/engine/index.ts`).
+- Числа: `src/data/balance.json` (`base` + `modes.cadet` / `modes.commander` + `bot`).
+- События: названия в `events.json`, варианты выбора и их цена строятся в `src/engine/rules.ts` (`eventChoices`), а не через тип `Effect`.
+- Тексты: статические (слова, имена экипажа, названия миссий) в `en.json`; фразы движка пока строками в коде. Перенос в ключи — отдельная задача.
+- Случайности в исходах нет вообще: сид (название миссии) определяет только расписание.
+- `sites.json`, `facts.json`, `radlab-iss.json` новым движком не используются.

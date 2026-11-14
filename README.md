@@ -25,3 +25,19 @@ npm run simulate
 - More in `DATA.md` (to be written by the data owner).
 
 Team plan: [PLAN.md](PLAN.md). Rules for contributors and AI assistants: [CLAUDE.md](CLAUDE.md).
+
+## Status after the greybox merge
+
+The engine in `src/engine/` now runs the mechanics from the greybox prototype (see `greybox/`):
+
+- **Energy cells** for 5 systems (life support, shield, greenhouse, radio, lab), unlocked one per sol on sols 1-4.
+- **Crew of five with one job per sol** (grow, fix, outside, lab, care, rest), specialists, tiredness, the medbay.
+- **Dose badges** in real mSv; solar storms come only from real DONKI SEP records in `src/data/donki-periods.json`.
+- **Events**: trouble with 2-3 priced choices, chances, quiet sols; trouble left alone grows.
+- **Radio**: one message per sol, answer next morning, blackout on sols 11-12.
+- **Stars, Captain's report, "Same Mars again"**, mission names as seeds, the discovery album.
+- No dice: the same mission name and the same choices always give the same result.
+
+All numbers are in `src/data/balance.json` (`base` = Commander, `modes` = overrides). `npm run simulate -- 300` plays three bots (careful, sloppy, lazy) and fails if the balance guard rails break.
+
+Still open: engine sentences are English strings in the code (not keys in `en.json` yet); album cards have titles only (no NASA photos or facts); the screens are plain React without the pixel art; `sites.json`, `facts.json` and `radlab-iss.json` are not used by the new engine.
