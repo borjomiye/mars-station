@@ -310,11 +310,13 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
   }
 
   // 3) lab
-  const labOn = isUnlocked(s, 'lab') && cells.lab >= c.SYSTEMS.lab.want;
+  // A partly powered lab works at partial speed: 1 of 2 cells = half the work. Scanning needs the full lab.
+  const labPower = isUnlocked(s, 'lab') ? Math.min(1, cells.lab / c.SYSTEMS.lab.want) : 0;
+  const labOn = labPower >= 1 - 1e-9;
   for (const p of withJob('lab')) {
-    if (!labOn) { say(t('sol.noLabWork', { name: p.name }), t('sol.labDark')); continue; }
+    if (labPower <= 0) { say(t('sol.noLabWork', { name: p.name }), t('sol.labDark')); continue; }
     if (s.samples < 1) { say(t('sol.noLabWork', { name: p.name }), t('sol.noSamplesToStudy')); continue; }
-    s.labWork = r3(s.labWork + workPower(c, p, 'lab'));
+    s.labWork = r3(s.labWork + workPower(c, p, 'lab') * labPower);
     let made = false;
     while (s.labWork >= c.LAB_WORK_PER_SAMPLE - 1e-9 && s.samples >= 1) {
       s.labWork = Math.max(0, r3(s.labWork - c.LAB_WORK_PER_SAMPLE));

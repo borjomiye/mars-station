@@ -18,7 +18,7 @@ export function helperLine(s: GameState, picking: boolean): string {
     if (tired) return t('helper.isTiredHeavyWorkWill', { name: tired.name });
     if (pc.life < c.SYSTEMS.life.want) return t('helper.lifeSupportIsShortAir');
     if (day.storm && pc.shield < c.SYSTEMS.shield.want) return t('helper.stormTodayAndTheShield');
-    if (labber && pc.lab < c.SYSTEMS.lab.want) return t('helper.theLabIsDarkCan', { name: labber.name });
+    if (labber && pc.lab === 0) return t('helper.theLabIsDarkCan', { name: labber.name });
     if (labber && s.samples < 1) return t('helper.noSamplesYetHasNothing', { name: labber.name });
     if (fixer && !s.problems.some((p) => c.PROBLEMS[p.type].where === 'inside')) return t('helper.nothingIsBrokenInsideHas', { name: fixer.name });
     if (free > 0) return t('helper.youHaveUnusedCellsAre', { free: plural(free, t('helper.freeCell')) });

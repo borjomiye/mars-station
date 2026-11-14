@@ -205,11 +205,15 @@ describe('radiation', () => {
 });
 
 describe('lab, science and radio', () => {
-  it('the scientist turns a sample into a card in one sol; an underpowered lab does nothing', () => {
+  it('the scientist turns a sample into a card in one sol; a half-powered lab works at half speed; a dark lab does nothing', () => {
     const ok = run(mk(6, (t) => { t.samples = 1; }), plan({ lab: 2 }, { otto: 'lab' }));
     expect(ok.cards.found).toContain('lab_1');
     expect(ok.samples).toBeCloseTo(0);
-    expect(run(mk(6, (t) => { t.samples = 1; }), plan({ lab: 1 }, { otto: 'lab' })).cards.found).not.toContain('lab_1');
+    const half = run(mk(6, (t) => { t.samples = 1; }), plan({ lab: 1 }, { otto: 'lab' }));
+    expect(half.cards.found).not.toContain('lab_1');
+    expect(half.labWork).toBeCloseTo(1);
+    const dark = run(mk(6, (t) => { t.samples = 1; }), plan({ lab: 0 }, { otto: 'lab' }));
+    expect(dark.labWork).toBeCloseTo(0);
   });
   it('science counts only when the report is sent', () => {
     const s = proceed(run(mk(6, (t) => { t.cards.found = ['layered_rock', 'lab_1']; }), plan({ radio: 1 })));
