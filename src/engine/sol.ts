@@ -1,5 +1,4 @@
-// One sol = briefing -> plan -> event -> results -> radio. Pure functions: (state, decision) -> new state.
-// Same mission name + same choices = same result: nothing here rolls dice.
+import { t } from './text';
 import type { ChosenChoice, CrewMember, EffectiveJob, Forecast, GameState, MessageOption, Mode, Morning, Phase, Plan, RadioMessageId, RealEvent, ResultLine, SolRecord, Storm } from './types';
 import { SYSTEMS } from './types';
 import { cardDef, cards, cfg, crewDefs, words } from './content';
@@ -29,13 +28,13 @@ export function go(s: GameState, to: Phase): GameState {
 function setSupply(s: GameState): void {
   const c = cfg(s.mode), d = today(s);
   let v = c.CELLS_BY_WEATHER[d.weather];
-  const notes = [d.weather + ' sky ' + v];
+  const notes = [t('sol.sky', { weather: d.weather, cells: v })];
   for (const p of s.problems) {
     const pd = c.PROBLEMS[p.type];
-    if (pd.cellsLost) { v -= pd.cellsLost * p.severity; notes.push(pd.name.toLowerCase() + ' −' + pd.cellsLost * p.severity); }
+    if (pd.cellsLost) { v -= pd.cellsLost * p.severity; notes.push(t('sol.cellsLostNote', { problem: pd.name.toLowerCase(), severity: pd.cellsLost * p.severity })); }
   }
-  if (s.panelBoost && s.sol <= s.panelBoost.until) { v += s.panelBoost.cells; notes.push('polished panels +' + s.panelBoost.cells); }
-  if (s.battery > 0) { v += s.battery; notes.push('battery +' + s.battery); s.battery = 0; }
+  if (s.panelBoost && s.sol <= s.panelBoost.until) { v += s.panelBoost.cells; notes.push(t('sol.polishedPanels', { cells: s.panelBoost.cells })); }
+  if (s.battery > 0) { v += s.battery; notes.push(t('sol.battery', { battery: s.battery })); s.battery = 0; }
   s.supply = Math.max(0, v);
   s.supplyNotes = notes;
 }
@@ -44,27 +43,27 @@ function deliverAnswer(s: GameState, id: RadioMessageId): string {
   const c = cfg(s.mode);
   if (id === 'forecast') {
     for (let k = 1; k <= c.RADIO_FORECAST_SOLS; k++) know(s, s.sol + k);
-    return 'Earth sent the space weather forecast. See it below.';
+    return t('sol.earthSentTheSpaceWeather');
   }
   if (id === 'fix') {
     const p = s.problems[0];
-    if (!p) return 'Earth says: "Your call, Captain."';
+    if (!p) return t('sol.earthSaysYourCallCaptain');
     p.advice += 1;
-    return 'Earth sent a repair trick. ' + c.PROBLEMS[p.type].name + ' needs less work.';
+    return t('sol.earthSentARepairTrick', { name: c.PROBLEMS[p.type].name });
   }
   if (id === 'doctors') {
     findCard(s, 'bones');
     const pat = s.crew.filter((p) => p.medbay > 0).sort((a, b) => b.medbay - a.medbay)[0];
     if (pat) {
       pat.medbay = Math.max(0, pat.medbay - 1);
-      if (pat.medbay <= 0) { pat.cond = 'fine'; return 'The doctors helped. ' + pat.name + ' leaves the medbay today.'; }
-      return 'The doctors helped. ' + pat.name + ' heals one sol sooner.';
+      if (pat.medbay <= 0) { pat.cond = 'fine'; return t('sol.theDoctorsHelpedLeavesThe', { name: pat.name }); }
+      return t('sol.theDoctorsHelpedHealsOne', { name: pat.name });
     }
     const ill = s.crew.find((p) => p.sick);
-    if (ill) { ill.sickRest += 1; return 'The doctors helped. ' + ill.name + ' needs less bed rest.'; }
-    return 'Earth says: "Your call, Captain."';
+    if (ill) { ill.sickRest += 1; return t('sol.theDoctorsHelpedNeedsLess', { name: ill.name }); }
+    return t('sol.earthSaysYourCallCaptain');
   }
-  return 'Earth got your science report. Thank you!';
+  return t('sol.earthGotYourScienceReport');
 }
 
 /** Morning of the next sol. Mutates (called on a clone). */
@@ -74,29 +73,29 @@ function nextSol(s: GameState): GameState {
   s.sol++;
   const day = today(s), M: Morning = { lines: [], notes: [], answers: [], unlocked: [], words: [] };
   if (s.sol === 1) {
-    M.lines.push('Landing done. The station is running.');
-    M.lines.push('The ship home lands on sol ' + c.MISSION_SOLS + '.');
+    M.lines.push(t('sol.landingDoneTheStationIs'));
+    M.lines.push(t('sol.theShipHomeLandsOn', { missionSols: c.MISSION_SOLS }));
   } else {
-    const steps = fmt(s.crop) + ' of ' + c.CROP_STEPS_TO_HARVEST + ' steps.';
-    M.lines.push(last && last.harvests ? 'Harvest came in. New crop is at ' + steps : 'Greenhouse: crop is at ' + steps);
-    M.lines.push(s.problems.length ? 'Open trouble: ' + s.problems.map((p) => c.PROBLEMS[p.type].name).join(', ') + '.' : 'Hull is holding. Nothing is broken.');
+    const steps = t('sol.ofSteps', { crop: fmt(s.crop), cropStepsToHarvest: c.CROP_STEPS_TO_HARVEST });
+    M.lines.push(last && last.harvests ? t('sol.harvestCameInNewCrop', { steps }) : t('sol.greenhouseCropIsAt', { steps }));
+    M.lines.push(s.problems.length ? t('sol.openTrouble', { names: s.problems.map((p) => c.PROBLEMS[p.type].name).join(', ') }) : t('sol.hullIsHoldingNothingIs'));
     const med = s.crew.filter((p) => p.medbay > 0);
-    M.lines.push(med.length ? 'In the medbay: ' + med.map((p) => p.name).join(', ') + '.' : 'Nobody is in the medbay.');
+    M.lines.push(med.length ? t('sol.inTheMedbay', { names: med.map((p) => p.name).join(', ') }) : t('sol.nobodyIsInTheMedbay'));
   }
   if (prev && prev.weather === 'dust' && day.weather !== 'dust') {
-    if (!s.flags.panelsCovered) { addProblem(s, 'dusty_panels'); M.notes.push('Dust storm is over. Panels are dusty: fewer cells.'); }
-    else M.notes.push('Dust storm is over. The panels stayed clean.');
+    if (!s.flags.panelsCovered) { addProblem(s, 'dusty_panels'); M.notes.push(t('sol.dustStormIsOverPanels')); }
+    else M.notes.push(t('sol.dustStormIsOverThe'));
     s.flags.panelsCovered = false;
   }
   // Earth's answer arrives at breakfast, if the radio can hear it
   if (s.radio.queue.length) {
-    if (isBlackout(s)) M.answers.push('No word from Earth. The Sun is in the way.');
-    else if (radioBlocked(s)) M.answers.push('No word from Earth. The antenna is off.');
+    if (isBlackout(s)) M.answers.push(t('sol.noWordFromEarthThe'));
+    else if (radioBlocked(s)) M.answers.push(t('sol.noWordFromEarthThe2'));
     else { for (const m of s.radio.queue) M.answers.push(deliverAnswer(s, m.id)); s.radio.queue = []; }
   }
   for (let k = 1; k <= c.AUTO_FORECAST_SOLS; k++) know(s, s.sol + k);
   for (const k of SYSTEMS) if (c.SYSTEMS[k].unlockSol === s.sol && s.sol > 1) M.unlocked.push(c.SYSTEMS[k].name);
-  if (s.sol === c.JOB_UNLOCK_SOL) M.unlocked.push('Crew jobs');
+  if (s.sol === c.JOB_UNLOCK_SOL) M.unlocked.push(t('sol.crewJobs'));
   const word = (k: string) => { if (!s.seenWords.includes(k)) { s.seenWords.push(k); M.words.push(words[k]); } };
   if (s.sol === 1) { word('sol'); word('cell'); }
   if (s.sol === c.SYSTEMS.shield.unlockSol) word('msv');
@@ -112,7 +111,7 @@ function nextSol(s: GameState): GameState {
       const job = c.PROBLEMS[pr.type].where === 'outside' ? 'outside' : 'fix';
       const pool = s.crew.filter((p) => jobAllowed(s, p, job).ok && !p.sick && p.cond !== 'tired');
       const who = pool.find((p) => p.role === 'engineer') || pool[0];
-      if (who) { s.plan.jobs[who.id] = job; M.notes.push(who.name + ' is set to fix the ' + c.PROBLEMS[pr.type].name.toLowerCase() + ' today.'); }
+      if (who) { s.plan.jobs[who.id] = job; M.notes.push(t('sol.isSetToFixThe', { name: who.name, problem: c.PROBLEMS[pr.type].name.toLowerCase() })); }
     }
     s.flags.prefill = null;
   }
@@ -236,22 +235,22 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
     s[key] = clamp(s[key] + d, 0, c.TANK_MAX);
     const real = s[key] - b;
     if (key === 'air') rec.air.push({ d: real, key: causeKey || why });
-    if (real !== 0) say(label + ' ' + signed(real) + (real !== d ? (d > 0 ? ' (tank full)' : ' (tank empty)') : ''), why);
-    else say(label + (d > 0 ? ' tank is full' : ' tank is empty'), why);
+    if (real !== 0) say(t('sol.tankChange', { label, change: signed(real), note: (real !== d ? (d > 0 ? t('sol.tankFull') : t('sol.tankEmpty')) : '') }), why);
+    else say(label + (d > 0 ? t('sol.tankIsFull') : t('sol.tankIsEmpty')), why);
   };
-  const air = (d: number, why: string, key?: string) => tank('air', 'Air & water', d, why, key);
-  const food = (d: number, why: string) => tank('food', 'Food', d, why);
+  const air = (d: number, why: string, key?: string) => tank('air', t('sol.airWater'), d, why, key);
+  const food = (d: number, why: string) => tank('food', t('sol.food'), d, why);
 
   // 0) events that act before the work day
   if (ev && ch && ev.id === 'sick_crew' && s.today.sickId) {
     const p = crewById(s, s.today.sickId);
-    if (ch.id === 'medbay_now') { enterMedbay(s, p, c.ILLNESS_MEDBAY_STEPS, 'feeling ill'); say(p.name + ' went to the medbay', 'ill, your choice'); }
+    if (ch.id === 'medbay_now') { enterMedbay(s, p, c.ILLNESS_MEDBAY_STEPS, t('sol.feelingIll')); say(t('sol.wentToTheMedbay', { name: p.name }), t('sol.illYourChoice')); }
     else { p.sick = true; p.sickRest = 0; }
   }
   if (ev && ch && ev.id === 'power_fault') {
-    if (ch.id === 'dark_greenhouse') say('Greenhouse dark today', 'blown fuse, your choice');
-    else if (ch.id === 'dark_labradio') say('Lab and radio dark today', 'blown fuse, your choice');
-    else say('Fuse rewired: nothing went dark', names(withJob('rewire')) + ' spent the day on it');
+    if (ch.id === 'dark_greenhouse') say(t('sol.greenhouseDarkToday'), t('sol.blownFuseYourChoice'));
+    else if (ch.id === 'dark_labradio') say(t('sol.labAndRadioDarkToday'), t('sol.blownFuseYourChoice'));
+    else say(t('sol.fuseRewiredNothingWentDark'), t('sol.spentTheDayOnIt', { names: names(withJob('rewire')) }));
   }
 
   // 1) repairs inside and outside; free outside workers collect samples
@@ -276,16 +275,16 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
   const task = ch ? ch.task : null, picked = ch ? ch.crew : [];
   const special = (id: string) => picked.includes(id) && (task === 'chance' || task === 'cover' || task === 'polish');
   // nothing to fix = idle: neither heavy work nor rest
-  for (const p of repair('inside', withJob('fix'))) { say(p.name + ' had nothing to fix', 'nothing is broken inside'); jobs[p.id] = 'idle'; }
+  for (const p of repair('inside', withJob('fix'))) { say(t('sol.hadNothingToFix', { name: p.name }), t('sol.nothingIsBrokenInside')); jobs[p.id] = 'idle'; }
   for (const p of repair('outside', withJob('outside').filter((x) => !special(x.id)))) {
     const n = workPower(c, p, 'outside');
     s.samples = r3(s.samples + n);
-    say('Samples ' + signed(n), p.name + ' went outside');
+    say(t('sol.samples', { amount: signed(n) }), t('sol.wentOutside', { name: p.name }));
   }
   for (const pr of s.problems) {
     const pd = c.PROBLEMS[pr.type];
-    if (pr.fixed) { say(pd.name + ' fixed!', 'repair by ' + (pr.by || []).join(' and ')); if (pd.airOnFix) air(pd.airOnFix, pd.name.toLowerCase() + ' works again', 'fix'); }
-    else if (pr.by && pr.by.length) say(pd.name + ': repair ' + fmt(pr.done) + ' of ' + fmt(problemNeed(c, pr)), pr.by.join(' and ') + ' worked on it');
+    if (pr.fixed) { say(t('sol.fixed', { name: pd.name }), t('sol.repairBy', { names: (pr.by || []).join(' and ') })); if (pd.airOnFix) air(pd.airOnFix, t('sol.worksAgain', { problem: pd.name.toLowerCase() }), 'fix'); }
+    else if (pr.by && pr.by.length) say(t('sol.repairOf', { name: pd.name, done: fmt(pr.done), needed: fmt(problemNeed(c, pr)) }), t('sol.workedOnIt', { names: pr.by.join(' and ') }));
     delete pr.by;
   }
   s.problems = s.problems.filter((pr) => !pr.fixed);
@@ -297,24 +296,24 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
   if (cells.greenhouse > 0) {
     const st = cells.greenhouse * c.STEPS_PER_GREENHOUSE_CELL * lf;
     steps += st;
-    say('Crop +' + plural(st, 'step'), plural(cells.greenhouse, 'greenhouse cell') + (lamp ? ', lamps are faulty' : ''));
-  } else say('Crops wait', 'greenhouse dark');
+    say(t('sol.crop', { steps: plural(st, 'step') }), plural(cells.greenhouse, t('sol.greenhouseCell')) + (lamp ? t('sol.lampsAreFaulty') : ''));
+  } else say(t('sol.cropsWait'), t('sol.greenhouseDark'));
   for (const p of withJob('grow')) {
-    if (cells.greenhouse > 0 || !c.GROW_NEEDS_LIGHT) { const st = workPower(c, p, 'grow'); steps += st; say('Crop +' + plural(st, 'step'), p.name + ' tended the plants'); }
-    else say(p.name + ' could not grow', 'greenhouse dark');
+    if (cells.greenhouse > 0 || !c.GROW_NEEDS_LIGHT) { const st = workPower(c, p, 'grow'); steps += st; say(t('sol.crop', { steps: plural(st, 'step') }), t('sol.tendedThePlants', { name: p.name })); }
+    else say(t('sol.couldNotGrow', { name: p.name }), t('sol.greenhouseDark'));
   }
   s.crop = r3(s.crop + steps);
   while (s.crop >= c.CROP_STEPS_TO_HARVEST - 1e-9) {
     s.crop = Math.max(0, r3(s.crop - c.CROP_STEPS_TO_HARVEST));
     rec.harvests++; s.counters.harvests++;
-    food(c.HARVEST_FOOD, 'harvest: crop reached ' + c.CROP_STEPS_TO_HARVEST + ' steps');
+    food(c.HARVEST_FOOD, t('sol.harvestCropReachedSteps', { cropStepsToHarvest: c.CROP_STEPS_TO_HARVEST }));
   }
 
   // 3) lab
   const labOn = isUnlocked(s, 'lab') && cells.lab >= c.SYSTEMS.lab.want;
   for (const p of withJob('lab')) {
-    if (!labOn) { say(p.name + ': no lab work', 'lab dark'); continue; }
-    if (s.samples < 1) { say(p.name + ': no lab work', 'no samples to study'); continue; }
+    if (!labOn) { say(t('sol.noLabWork', { name: p.name }), t('sol.labDark')); continue; }
+    if (s.samples < 1) { say(t('sol.noLabWork', { name: p.name }), t('sol.noSamplesToStudy')); continue; }
     s.labWork = r3(s.labWork + workPower(c, p, 'lab'));
     let made = false;
     while (s.labWork >= c.LAB_WORK_PER_SAMPLE - 1e-9 && s.samples >= 1) {
@@ -322,10 +321,10 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
       s.samples = r3(s.samples - 1);
       made = true;
       const next = cards.find((k) => k.kind === 'lab' && !s.cards.found.includes(k.id));
-      if (next) findCard(s, next.id, say, p.name + ' studied a sample');
-      else say('Sample studied: nothing new', 'all lab cards are found');
+      if (next) findCard(s, next.id, say, t('sol.studiedASample', { name: p.name }));
+      else say(t('sol.sampleStudiedNothingNew'), t('sol.allLabCardsAreFound'));
     }
-    if (!made) say('Sample half studied', p.name + ' worked in the lab');
+    if (!made) say(t('sol.sampleHalfStudied'), t('sol.workedInTheLab', { name: p.name }));
   }
   if (s.samples < 1) s.labWork = 0;
 
@@ -333,24 +332,24 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
   if (ev && ch && ev.kind === 'chance' && ev.id !== 'clean_wind') {
     if (ch.id === 'outside') {
       const p = crewById(s, picked[0]);
-      findCard(s, ev.card, say, p.name + ' went outside for it');
+      findCard(s, ev.card, say, t('sol.wentOutsideForIt', { name: p.name }));
       s.samples = r3(s.samples + c.CHANCE_SAMPLES);
-      say('Samples ' + signed(c.CHANCE_SAMPLES), p.name + ' brought one back');
+      say(t('sol.samples2', { chanceSamples: signed(c.CHANCE_SAMPLES) }), t('sol.broughtOneBack', { name: p.name }));
     } else if (ch.id === 'scan') {
-      if (labOn && withJob('scan').length) findCard(s, ev.card, say, names(withJob('scan')) + ' scanned it from the lab');
-      else say('Scan failed', 'lab dark');
-    } else say('Chance gone', 'you let it go');
+      if (labOn && withJob('scan').length) findCard(s, ev.card, say, t('sol.scannedItFromTheLab', { names: names(withJob('scan')) }));
+      else say(t('sol.scanFailed'), t('sol.labDark'));
+    } else say(t('sol.chanceGone'), t('sol.youLetItGo'));
   }
   if (ev && ch && ev.id === 'clean_wind') {
-    if (ch.id === 'use_now') say('Cells +' + c.WIND_BONUS_CELLS + ' today', 'wind cleaned the panels');
+    if (ch.id === 'use_now') say(t('sol.cellsToday', { windBonusCells: c.WIND_BONUS_CELLS }), t('sol.windCleanedThePanels'));
     else if (ch.id === 'polish') {
       s.panelBoost = { cells: c.WIND_POLISH_CELLS, until: s.sol + c.WIND_POLISH_SOLS };
-      say('Cells +' + c.WIND_POLISH_CELLS + ' for ' + c.WIND_POLISH_SOLS + ' sols', crewById(s, picked[0]).name + ' polished the panels');
-    } else say('Chance gone', 'you let it go');
+      say(t('sol.cellsForSols', { windPolishCells: c.WIND_POLISH_CELLS, windPolishSols: c.WIND_POLISH_SOLS }), t('sol.polishedThePanels', { name: crewById(s, picked[0]).name }));
+    } else say(t('sol.chanceGone'), t('sol.youLetItGo'));
   }
   if (ev && ch && ev.id === 'dust_storm') {
-    if (ch.id === 'cover') { s.flags.panelsCovered = true; say('Panels tilted against the dust', crewById(s, picked[0]).name + ' went outside'); }
-    else say('Panels left in the dust', 'you waited it out');
+    if (ch.id === 'cover') { s.flags.panelsCovered = true; say(t('sol.panelsTiltedAgainstTheDust'), t('sol.wentOutside', { name: crewById(s, picked[0]).name })); }
+    else say(t('sol.panelsLeftInTheDust'), t('sol.youWaitedItOut'));
   }
 
   // 5) care: all of it goes to the first patient
@@ -358,19 +357,19 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
   if (carers.length) {
     const pts = carers.reduce((a, p) => a + workPower(c, p, 'care'), 0);
     const pat = s.crew.filter((p) => jobs[p.id] === 'medbay').sort((a, b) => b.medbay - a.medbay)[0] || s.crew.find((p) => p.sick && jobs[p.id] === 'rest');
-    if (pat) careFor[pat.id] = pts; else say(names(carers) + ' had nobody to care for', 'nobody is ill');
+    if (pat) careFor[pat.id] = pts; else say(t('sol.hadNobodyToCareFor', { carers: names(carers) }), t('sol.nobodyIsIll'));
   }
 
   // 6) air & water
   const miss = c.SYSTEMS.life.want - cells.life;
-  if (miss > 0) air(-miss * c.AIR_LOSS_PER_MISSING_CELL, 'life support ' + plural(miss, 'cell') + ' short', 'life');
-  else if (miss < 0) air(-miss * c.AIR_GAIN_PER_EXTRA_CELL, 'extra life support cell', 'extra');
-  for (const pr of s.problems) { const pd = c.PROBLEMS[pr.type]; if (pd.airLeak) air(-pd.airLeak * pr.severity, pd.name.toLowerCase() + ' leaks', pr.type); }
+  if (miss > 0) air(-miss * c.AIR_LOSS_PER_MISSING_CELL, t('sol.lifeSupportShort', { miss: plural(miss, 'cell') }), 'life');
+  else if (miss < 0) air(-miss * c.AIR_GAIN_PER_EXTRA_CELL, t('sol.extraLifeSupportCell'), 'extra');
+  for (const pr of s.problems) { const pd = c.PROBLEMS[pr.type]; if (pd.airLeak) air(-pd.airLeak * pr.severity, t('sol.leaks', { problem: pd.name.toLowerCase() }), pr.type); }
   // 7) food
-  food(-c.FOOD_EATEN_PER_SOL, 'the crew ate');
+  food(-c.FOOD_EATEN_PER_SOL, t('sol.theCrewAte'));
 
   // 8) radiation: the badge only fills
-  if (storm) say('Solar storm: dose x' + storm.mult + ' without shield', cells.shield >= c.SYSTEMS.shield.want ? 'shield at full power: minimum dose inside' : 'shield has ' + cells.shield + ' of ' + c.SYSTEMS.shield.want + ' cells');
+  if (storm) say(t('sol.solarStormDoseXWithout', { mult: storm.mult }), cells.shield >= c.SYSTEMS.shield.want ? t('sol.shieldAtFullPowerMinimum') : t('sol.shieldHasOfCells', { shield: cells.shield, want: c.SYSTEMS.shield.want }));
   for (const p of s.crew) {
     const j = jobs[p.id], r = doseFor(c, storm, j, cells.shield), b0 = badgeOf(c, p.dose);
     p.dose = r3(p.dose + r.d);
@@ -378,8 +377,8 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
     if (j === 'outside') p.trips++;
     const b1 = badgeOf(c, p.dose);
     if (b1 !== b0) {
-      say(p.name + "'s badge turned " + b1, j === 'outside' ? 'trip outside' : r.extra > 0.01 ? 'storm with a weak shield' : 'dose adds up every sol');
-      if (b1 === 'red' && c.RED_BADGE_GROUNDS) { p.grounded = true; say(p.name + ' stays inside from now on', 'red badge'); }
+      say(t('sol.sBadgeTurned', { name: p.name, b1 }), j === 'outside' ? t('sol.tripOutside') : r.extra > 0.01 ? t('sol.stormWithAWeakShield') : t('sol.doseAddsUpEverySol'));
+      if (b1 === 'red' && c.RED_BADGE_GROUNDS) { p.grounded = true; say(t('sol.staysInsideFromNowOn', { name: p.name }), t('sol.redBadge')); }
     }
   }
 
@@ -389,30 +388,30 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
     if (j === 'medbay') {
       p.medbaySols++; s.counters.medbaySols++;
       p.medbay = r3(p.medbay - c.MEDBAY_HEAL_PER_SOL - (careFor[p.id] || 0));
-      if (p.medbay <= 1e-9) { p.medbay = 0; p.cond = 'fine'; p.sick = false; p.heavyStreak = 0; say(p.name + ' leaves the medbay', careFor[p.id] ? 'healed faster with care' : 'healed'); }
-      else say(p.name + ' stays in the medbay', plural(Math.ceil(p.medbay), 'more sol'));
+      if (p.medbay <= 1e-9) { p.medbay = 0; p.cond = 'fine'; p.sick = false; p.heavyStreak = 0; say(t('sol.leavesTheMedbay', { name: p.name }), careFor[p.id] ? t('sol.healedFasterWithCare') : 'healed'); }
+      else say(t('sol.staysInTheMedbay', { name: p.name }), plural(Math.ceil(p.medbay), t('sol.moreSol')));
       continue;
     }
     if (p.sick) {
       if (j === 'rest') {
         p.sickRest = r3(p.sickRest + 1 + (careFor[p.id] || 0));
         p.heavyStreak = 0;
-        if (p.sickRest >= c.SICK_REST_SOLS_TO_CURE - 1e-9) { p.sick = false; p.sickRest = 0; p.cond = 'fine'; say(p.name + ' is well again', careFor[p.id] ? 'bed rest and care' : 'bed rest'); }
-        else say(p.name + ' rests in the bunk', 'one more rest sol needed');
-      } else { enterMedbay(s, p, c.SICK_WORK_MEDBAY_STEPS, 'working while ill'); say(p.name + ' got worse: medbay', 'worked while ill'); }
+        if (p.sickRest >= c.SICK_REST_SOLS_TO_CURE - 1e-9) { p.sick = false; p.sickRest = 0; p.cond = 'fine'; say(t('sol.isWellAgain', { name: p.name }), careFor[p.id] ? t('sol.bedRestAndCare') : t('sol.bedRest')); }
+        else say(t('rules.restsInTheBunk', { name: p.name }), t('sol.oneMoreRestSolNeeded'));
+      } else { enterMedbay(s, p, c.SICK_WORK_MEDBAY_STEPS, t('sol.workingWhileIll')); say(t('sol.gotWorseMedbay', { name: p.name }), t('sol.workedWhileIll')); }
       continue;
     }
     if (c.HEAVY_JOBS.includes(j)) {
       if (p.cond === 'tired' && c.TIRED_HEAVY_WORK_INJURES) {
-        enterMedbay(s, p, c.INJURY_MEDBAY_STEPS, j === 'outside' ? 'a trip outside while tired' : 'heavy work while tired');
-        say(p.name + ' got hurt: medbay', 'heavy work while tired');
+        enterMedbay(s, p, c.INJURY_MEDBAY_STEPS, j === 'outside' ? t('sol.aTripOutsideWhileTired') : t('sol.heavyWorkWhileTired'));
+        say(t('sol.gotHurtMedbay', { name: p.name }), t('sol.heavyWorkWhileTired'));
       } else {
         p.heavyStreak++;
-        if (p.heavyStreak >= c.HEAVY_SOLS_TO_TIRED && p.cond !== 'tired') { p.cond = 'tired'; say(p.name + ' is tired', c.HEAVY_SOLS_TO_TIRED + ' heavy sols in a row'); }
+        if (p.heavyStreak >= c.HEAVY_SOLS_TO_TIRED && p.cond !== 'tired') { p.cond = 'tired'; say(t('sol.isTired', { name: p.name }), t('sol.heavySolsInARow', { heavySolsToTired: c.HEAVY_SOLS_TO_TIRED })); }
       }
     } else {
       p.heavyStreak = 0;
-      if (j === 'rest' && p.cond === 'tired') { p.cond = 'fine'; say(p.name + ' is rested', 'took a rest sol'); }
+      if (j === 'rest' && p.cond === 'tired') { p.cond = 'fine'; say(t('sol.isRested', { name: p.name }), t('sol.tookARestSol')); }
     }
   }
 
@@ -420,25 +419,25 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
   for (const pr of s.problems) {
     const pd = c.PROBLEMS[pr.type];
     pr.age++;
-    if (pd.growEvery > 0 && pr.age % pd.growEvery === 0 && pr.severity < pd.maxSeverity) { pr.severity++; say(pd.name + ' grew worse', 'left open for ' + plural(pr.age, 'sol')); }
+    if (pd.growEvery > 0 && pr.age % pd.growEvery === 0 && pr.severity < pd.maxSeverity) { pr.severity++; say(t('sol.grewWorse', { name: pd.name }), t('sol.leftOpenFor', { age: plural(pr.age, 'sol') })); }
   }
   if (ev && ch && ch.id === 'tomorrow' && ev.problem) s.flags.prefill = ev.problem;
 
   // 11) milestone cards
   const next = dayAt(s, s.sol + 1);
-  if (rec.harvests > 0) findCard(s, 'space_radishes', say, 'first harvest');
-  if (day.storm && !(next && next.storm)) findCard(s, 'storm_survived', say, 'the solar storm passed');
-  if (day.weather === 'dust' && !(next && next.weather === 'dust')) findCard(s, 'dust_survived', say, 'the dust storm passed');
-  if (isBlackout(s) && !isBlackout(s, s.sol + 1)) findCard(s, 'conjunction', say, 'the radio blackout ended');
+  if (rec.harvests > 0) findCard(s, 'space_radishes', say, t('sol.firstHarvest'));
+  if (day.storm && !(next && next.storm)) findCard(s, 'storm_survived', say, t('sol.theSolarStormPassed'));
+  if (day.weather === 'dust' && !(next && next.weather === 'dust')) findCard(s, 'dust_survived', say, t('sol.theDustStormPassed'));
+  if (isBlackout(s) && !isBlackout(s, s.sol + 1)) findCard(s, 'conjunction', say, t('sol.theRadioBlackoutEnded'));
 
   // 12) unused cells
   const unused = rec.supply - planTotal(s.plan);
   if (unused > 0) {
     if (c.BATTERY_CAPACITY > 0) {
       s.battery = Math.min(c.BATTERY_CAPACITY, unused);
-      say(plural(s.battery, 'cell') + ' saved in the battery', 'not shared out');
-      if (unused > s.battery) say(plural(unused - s.battery, 'cell') + ' lost at sunset', 'battery is full');
-    } else say(plural(unused, 'cell') + ' lost at sunset', 'not shared out');
+      say(t('sol.savedInTheBattery', { battery: plural(s.battery, 'cell') }), t('sol.notSharedOut'));
+      if (unused > s.battery) say(t('sol.lostAtSunset', { battery: plural(unused - s.battery, 'cell') }), t('sol.batteryIsFull'));
+    } else say(t('sol.lostAtSunset2', { unused: plural(unused, 'cell') }), t('sol.notSharedOut'));
   }
 
   // 13) early return: nobody dies, Mission Control calls the crew home
@@ -446,7 +445,7 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
   s.counters.foodZero = s.food <= 0 ? s.counters.foodZero + 1 : 0;
   if (s.counters.airZero >= c.ZERO_SOLS_TO_LOSE) s.over = { won: false, why: 'air' };
   else if (s.counters.foodZero >= c.ZERO_SOLS_TO_LOSE) s.over = { won: false, why: 'food' };
-  else if (s.counters.airZero || s.counters.foodZero) say('Warning: a tank is empty', 'one more empty sol ends the mission');
+  else if (s.counters.airZero || s.counters.foodZero) say(t('sol.warningATankIsEmpty'), t('sol.oneMoreEmptySolEnds'));
 
   s.log.push(rec);
   s.lastResults = R;
@@ -467,10 +466,10 @@ export function radioCanSend(s: GameState): boolean {
 }
 export function radioOffReason(s: GameState): string {
   const c = cfg(s.mode), last = s.log[s.log.length - 1];
-  if (!isUnlocked(s, 'radio')) return 'The radio opens on sol ' + c.SYSTEMS.radio.unlockSol + '.';
-  if (isBlackout(s)) return 'Radio blackout: the Sun is between Mars and Earth.';
-  if (radioBlocked(s)) return 'No radio: the antenna is off.';
-  if (!last || last.cells.radio < c.SYSTEMS.radio.want) return 'No message tonight: the radio had no cell.';
+  if (!isUnlocked(s, 'radio')) return t('sol.theRadioOpensOnSol', { unlocksol: c.SYSTEMS.radio.unlockSol });
+  if (isBlackout(s)) return t('sol.radioBlackoutTheSunIs');
+  if (radioBlocked(s)) return t('sol.noRadioTheAntennaIs');
+  if (!last || last.cells.radio < c.SYSTEMS.radio.want) return t('sol.noMessageTonightTheRadio');
   return '';
 }
 export function messageOptions(s: GameState): MessageOption[] {
@@ -479,10 +478,10 @@ export function messageOptions(s: GameState): MessageOption[] {
   const pts = unsent.reduce((a, id) => a + c.SCIENCE_PER_CARD[cardDef(id).kind], 0) + firstBonus;
   const ill = s.crew.some((p) => p.medbay > 0 || p.sick);
   return [
-    { id: 'forecast', label: 'What will space weather be like?', plus: 'Forecast for ' + c.RADIO_FORECAST_SOLS + ' sols, at breakfast', minus: "Uses tonight's message", enabled: true, why: '' },
-    { id: 'fix', label: 'How can we fix it faster?', plus: 'The open repair needs less work', minus: "Uses tonight's message", enabled: s.problems.length > 0, why: 'Nothing is broken' },
-    { id: 'doctors', label: 'Ask the doctors', plus: 'A patient heals one sol sooner', minus: "Uses tonight's message", enabled: ill, why: 'Nobody is ill' },
-    { id: 'science', label: 'Send our science report', plus: plural(unsent.length + (firstBonus ? 1 : 0), 'card') + ' sent: +' + pts + ' science', minus: 'No question tonight, no forecast', enabled: unsent.length > 0, why: 'No new cards to send' },
+    { id: 'forecast', label: t('sol.whatWillSpaceWeatherBe'), plus: t('sol.forecastForSolsAtBreakfast', { radioForecastSols: c.RADIO_FORECAST_SOLS }), minus: t('sol.usesTonightSMessage'), enabled: true, why: '' },
+    { id: 'fix', label: t('sol.howCanWeFixIt'), plus: t('sol.theOpenRepairNeedsLess'), minus: t('sol.usesTonightSMessage'), enabled: s.problems.length > 0, why: t('sol.nothingIsBroken') },
+    { id: 'doctors', label: t('sol.askTheDoctors'), plus: t('sol.aPatientHealsOneSol'), minus: t('sol.usesTonightSMessage'), enabled: ill, why: t('sol.nobodyIsIll2') },
+    { id: 'science', label: t('sol.sendOurScienceReport'), plus: t('sol.sentScience', { card: plural(unsent.length + (firstBonus ? 1 : 0), 'card'), pts }), minus: t('sol.noQuestionTonightNoForecast'), enabled: unsent.length > 0, why: t('sol.noNewCardsToSend') },
   ];
 }
 

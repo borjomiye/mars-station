@@ -58,6 +58,6 @@ npm run fetch:donki  # реальные данные DONKI → src/data/donki-pe
 - Фазы сола: `briefing → plan → event → results → radio → report`. Публичные функции: `createMission`, `startPlanning`, `applyPlan`, `confirmPlan`, `resolveEvent`, `playSol`, `proceed`, `sendMessage`, `endMission` (все в `src/engine/index.ts`).
 - Числа: `src/data/balance.json` (`base` + `modes.cadet` / `modes.commander` + `bot`).
 - События: названия в `events.json`, варианты выбора и их цена строятся в `src/engine/rules.ts` (`eventChoices`), а не через тип `Effect`.
-- Тексты: статические (слова, имена экипажа, названия миссий) в `en.json`; фразы движка пока строками в коде. Перенос в ключи — отдельная задача.
+- Тексты: все фразы движка и помощника лежат в `src/data/en.json` в разделе `text` и вызываются через `t('ключ', { параметры })` из `src/engine/text.ts`. `{имя}` в тексте заменяется значением из кода. Тест `tests/text.test.ts` следит, что каждый ключ существует и ни один не лишний. Подписи кнопок и заголовки в `src/ui/*.tsx` пока строками в JSX.
 - Случайности в исходах нет вообще: сид (название миссии) определяет только расписание.
 - `sites.json`, `facts.json`, `radlab-iss.json` новым движком не используются.

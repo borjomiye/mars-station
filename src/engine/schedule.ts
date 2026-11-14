@@ -1,11 +1,10 @@
-// The whole mission is drawn from the seed here: real DONKI period, weather, event of every sol.
-// It does not depend on the mode, so Cadet and Commander fly the same Mars.
+import { t } from './text';
 import type { Day, DonkiEvent, DonkiPeriod, RealEvent } from './types';
 import { baseBalance, crewDefs, dayIndex, donki, missionNames } from './content';
 import { hashString, mulberry32 } from './rng';
 
 export function normSeed(name: string): string {
-  return String(name || '').toLowerCase().replace(/\s+/g, ' ').trim().replace(/^mission /, '') || 'brave otter';
+  return String(name || '').toLowerCase().replace(/\s+/g, ' ').trim().replace(/^mission /, '') || t('real.braveOtter');
 }
 export function prettyName(name: string): string {
   return normSeed(name).split(' ').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
@@ -21,8 +20,8 @@ const rank = (e: DonkiEvent): number =>
 
 /** "This really happened on <date>": we never say it hit Mars unless the model lists Mars. */
 function toReal(e: DonkiEvent): RealEvent {
-  const label = e.type === 'SEP' ? 'Solar particle storm' : e.type === 'FLR' ? `Solar flare ${e.classType ?? ''}`.trim() : `Plasma cloud from the Sun${e.speed ? `, ${e.speed} km/s` : ''}`;
-  const note = e.type === 'CME' ? (e.marsImpact ? 'model: heading for Mars' : 'model: not heading for Mars') : 'seen from near Earth';
+  const label = e.type === 'SEP' ? t('real.solarParticleStorm') : e.type === 'FLR' ? t('real.solarFlare', { flareClass: e.classType ?? '' }).trim() : t('real.plasmaCloudFromTheSun', { speed: e.speed ? t('real.kmS', { speed: e.speed }) : '' });
+  const note = e.type === 'CME' ? (e.marsImpact ? t('real.modelHeadingForMars') : t('real.modelNotHeadingForMars')) : t('real.seenFromNearEarth');
   return { id: e.id, type: e.type, date: e.date, label, note, link: e.link };
 }
 
@@ -87,7 +86,7 @@ export function buildSchedule(seed: string): { periodId: string; days: Day[] } {
   let nT = c.RANDOM_TROUBLES, nC = c.CHANCES_TOTAL - 1;
   while (nT + nC > free.length) { if (nT >= nC && nT > 0) nT--; else nC--; } // stormy missions drop random troubles first
   let kinds: string[] = [...Array(nT).fill('trouble'), ...Array(nC).fill('chance')];
-  while (kinds.length < free.length) kinds.push('quiet');
+  while (kinds.length < free.length) kinds.push(t('real.quiet'));
   kinds = shuffle(kinds);
   free.forEach((sol, i) => {
     if (kinds[i] === 'trouble') setEv(sol, 'trouble', troublePool.shift());

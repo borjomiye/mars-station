@@ -1,5 +1,4 @@
-// Queries and small rules shared by the sol loop, the UI and the bots. No state is changed here
-// except in the helpers marked "mutates" (they are only called on a clone inside the engine).
+import { t } from './text';
 import type { Badge, Choice, CrewMember, Day, EffectiveJob, Forecast, GameEvent, GameState, Job, PickSpec, Plan, Problem, Storm, SystemId } from './types';
 import { JOBS, SYSTEMS } from './types';
 import { cardDef, cfg, chances, troubles, type Balance } from './content';
@@ -33,10 +32,10 @@ export function problemNeed(c: Balance, p: Problem): number {
 }
 export function problemEffect(c: Balance, p: Problem): string {
   const d = c.PROBLEMS[p.type];
-  if (d.airLeak) return 'air & water −' + d.airLeak * p.severity;
-  if (d.growthFactor) return 'crops grow at x' + d.growthFactor[p.severity - 1];
-  if (d.blocksRadio) return 'no radio';
-  if (d.cellsLost) return '−' + plural(d.cellsLost * p.severity, 'cell');
+  if (d.airLeak) return t('rules.airWater', { severity: d.airLeak * p.severity });
+  if (d.growthFactor) return t('rules.cropsGrowAtX', { factor: d.growthFactor[p.severity - 1] });
+  if (d.blocksRadio) return t('rules.noRadio');
+  if (d.cellsLost) return t('rules.text2', { severity: plural(d.cellsLost * p.severity, 'cell') });
   return '';
 }
 export function radioBlocked(s: GameState): boolean { const c = cfg(s.mode); return s.problems.some((p) => c.PROBLEMS[p.type].blocksRadio); }
@@ -56,10 +55,10 @@ export function planTotal(plan: Plan): number { return SYSTEMS.reduce((a, k) => 
 
 export function jobAllowed(s: GameState, p: CrewMember, j: Job): { ok: boolean; why: string } {
   const c = cfg(s.mode);
-  if (p.medbay > 0) return { ok: false, why: 'in the medbay' };
-  if (s.sol < c.JOB_UNLOCK_SOL) return { ok: j === 'rest', why: 'jobs open on sol ' + c.JOB_UNLOCK_SOL };
-  if (j === 'outside' && p.grounded) return { ok: false, why: 'red badge: stays inside' };
-  if (j === 'lab' && !isUnlocked(s, 'lab')) return { ok: false, why: 'lab opens on sol ' + c.SYSTEMS.lab.unlockSol };
+  if (p.medbay > 0) return { ok: false, why: t('rules.inTheMedbay') };
+  if (s.sol < c.JOB_UNLOCK_SOL) return { ok: j === 'rest', why: t('rules.jobsOpenOnSol', { jobUnlockSol: c.JOB_UNLOCK_SOL }) };
+  if (j === 'outside' && p.grounded) return { ok: false, why: t('rules.redBadgeStaysInside') };
+  if (j === 'lab' && !isUnlocked(s, 'lab')) return { ok: false, why: t('rules.labOpensOnSol', { unlocksol: c.SYSTEMS.lab.unlockSol }) };
   return { ok: true, why: '' };
 }
 
@@ -167,7 +166,7 @@ export function enterMedbay(s: GameState, p: CrewMember, steps: number, cause: s
 export function findCard(s: GameState, id: string | null | undefined, say?: (t: string, why: string) => void, why = ''): boolean {
   if (!id || s.cards.found.includes(id)) return false;
   s.cards.found.push(id);
-  if (say) say('Card found: ' + cardDef(id).title, why);
+  if (say) say(t('rules.cardFound', { title: cardDef(id).title }), why);
   return true;
 }
 export function know(s: GameState, sol: number): void {
@@ -182,44 +181,44 @@ export function eventChoices(s: GameState): Choice[] {
   const free = s.crew.filter((p) => p.medbay <= 0), canOut = free.filter((p) => !p.grounded);
   const add = (id: string, label: string, plus: string, minus: string, extra: Partial<Choice> = {}) =>
     out.push({ id, label, plus, minus, pick: null, enabled: true, why: '', dose: null, ...extra });
-  const outPick = (task: string, max: number): Partial<Choice> => ({ pick: { job: 'outside', task, min: 1, max }, enabled: canOut.length > 0, why: 'Nobody can go outside' });
-  const inPick = (job: EffectiveJob, task: string, max: number): Partial<Choice> => ({ pick: { job, task, min: 1, max }, enabled: free.length > 0, why: 'Nobody is free' });
+  const outPick = (task: string, max: number): Partial<Choice> => ({ pick: { job: 'outside', task, min: 1, max }, enabled: canOut.length > 0, why: t('rules.nobodyCanGoOutside') });
+  const inPick = (job: EffectiveJob, task: string, max: number): Partial<Choice> => ({ pick: { job, task, min: 1, max }, enabled: free.length > 0, why: t('rules.nobodyIsFree') });
 
   if (ev.kind === 'trouble' && ev.problem) {
     const pr = s.problems.find((p) => p.type === ev.problem), pd = c.PROBLEMS[ev.problem], eff = pr ? problemEffect(c, pr) : '';
-    if (pd.where === 'outside') add('fix_now', 'Send crew outside now', 'Fixed today with enough hands', 'They get extra dose and drop their jobs', outPick('repair', 2));
-    else add('fix_now', 'Fix it now', 'Fixed today with enough hands', "They drop today's jobs", inPick('fix', 'repair', 2));
-    add('tomorrow', 'Fix it tomorrow', "Today's plan stays. A fixer is set for tomorrow", 'Tonight: ' + eff + '. It may grow.');
-    add('leave', 'Leave it', 'Costs nothing today', 'Every sol: ' + eff + '. It grows worse.');
+    if (pd.where === 'outside') add('fix_now', t('rules.sendCrewOutsideNow'), t('rules.fixedTodayWithEnoughHands'), t('rules.theyGetExtraDoseAnd'), outPick('repair', 2));
+    else add('fix_now', t('rules.fixItNow'), t('rules.fixedTodayWithEnoughHands'), t('rules.theyDropTodaySJobs'), inPick('fix', 'repair', 2));
+    add('tomorrow', t('rules.fixItTomorrow'), t('rules.todaySPlanStaysA'), t('rules.tonightItMayGrow', { eff }));
+    add('leave', t('rules.leaveIt'), t('rules.costsNothingToday'), t('rules.everySolItGrowsWorse', { eff }));
   } else if (ev.id === 'solar_storm') {
     const st = stormOn(s), sh = effectiveCells(s).shield;
     const anyOut = s.crew.some((p) => p.medbay <= 0 && !p.grounded && s.plan.jobs[p.id] === 'outside');
-    add('shelter_all', 'Everyone into the shelter', 'Less dose if the shield is weak', 'Nobody works today', { dose: doseFor(c, st, 'shelter', sh).d });
-    add('indoors', 'Keep working indoors', 'Jobs go on inside', anyOut ? 'Outside trips are called off' : 'Dose depends on shield power', { dose: doseFor(c, st, 'rest', sh).d });
-    if (anyOut) add('as_planned', 'Stick to the plan', 'Outside trips go ahead', 'Full storm dose outside', { dose: doseFor(c, st, 'outside', sh).d });
+    add('shelter_all', t('rules.everyoneIntoTheShelter'), t('rules.lessDoseIfTheShield'), t('rules.nobodyWorksToday'), { dose: doseFor(c, st, 'shelter', sh).d });
+    add('indoors', t('rules.keepWorkingIndoors'), t('rules.jobsGoOnInside'), anyOut ? t('rules.outsideTripsAreCalledOff') : t('rules.doseDependsOnShieldPower'), { dose: doseFor(c, st, 'rest', sh).d });
+    if (anyOut) add('as_planned', t('rules.stickToThePlan'), t('rules.outsideTripsGoAhead'), t('rules.fullStormDoseOutside'), { dose: doseFor(c, st, 'outside', sh).d });
   } else if (ev.id === 'sick_crew' && s.today.sickId) {
     const p = crewById(s, s.today.sickId);
-    add('medbay_now', p.name + ' goes to the medbay', 'Healed in ' + c.ILLNESS_MEDBAY_STEPS + ' sols, sooner with care', 'Out of work. No third star');
-    add('bed_rest', p.name + ' rests in the bunk', 'No medbay if the rest goes on', 'Needs ' + c.SICK_REST_SOLS_TO_CURE + ' rest sols in a row');
-    add('keep_working', p.name + ' keeps working', "Today's job gets done at half power", 'Medbay tonight, for ' + c.SICK_WORK_MEDBAY_STEPS + ' sols');
+    add('medbay_now', t('rules.goesToTheMedbay', { name: p.name }), t('rules.healedInSolsSoonerWith', { illnessMedbaySteps: c.ILLNESS_MEDBAY_STEPS }), t('rules.outOfWorkNoThird'));
+    add('bed_rest', t('rules.restsInTheBunk', { name: p.name }), t('rules.noMedbayIfTheRest'), t('rules.needsRestSolsInA', { sickRestSolsToCure: c.SICK_REST_SOLS_TO_CURE }));
+    add('keep_working', t('rules.keepsWorking', { name: p.name }), t('rules.todaySJobGetsDone'), t('rules.medbayTonightForSols', { sickWorkMedbaySteps: c.SICK_WORK_MEDBAY_STEPS }));
   } else if (ev.id === 'power_fault') {
-    add('dark_greenhouse', 'Greenhouse goes dark today', 'Lab and radio keep power', 'Crops wait. ' + plural(s.plan.cells.greenhouse, 'cell') + ' lost');
-    add('dark_labradio', 'Lab and radio go dark today', 'Crops keep growing', 'No science, no message. ' + plural(s.plan.cells.lab + s.plan.cells.radio, 'cell') + ' lost');
-    add('rewire', 'Rewire it now', 'Nothing goes dark', 'One crew member drops their job', inPick('rewire', 'rewire', 1));
+    add('dark_greenhouse', t('rules.greenhouseGoesDarkToday'), t('rules.labAndRadioKeepPower'), t('rules.cropsWaitLost', { greenhouse: plural(s.plan.cells.greenhouse, 'cell') }));
+    add('dark_labradio', t('rules.labAndRadioGoDark'), t('rules.cropsKeepGrowing'), t('rules.noScienceNoMessageLost', { radio: plural(s.plan.cells.lab + s.plan.cells.radio, 'cell') }));
+    add('rewire', t('rules.rewireItNow'), t('rules.nothingGoesDark'), t('rules.oneCrewMemberDropsTheir'), inPick('rewire', 'rewire', 1));
   } else if (ev.id === 'dust_storm') {
-    add('cover', 'Send someone to tilt the panels', 'Panels stay clean after the storm', 'Extra dose. Job dropped', outPick('cover', 1));
-    add('wait', 'Wait it out', 'Crew stays inside', 'Dusty panels later: fewer cells');
+    add('cover', t('rules.sendSomeoneToTiltThe'), t('rules.panelsStayCleanAfterThe'), t('rules.extraDoseJobDropped'), outPick('cover', 1));
+    add('wait', t('rules.waitItOut'), t('rules.crewStaysInside'), t('rules.dustyPanelsLaterFewerCells'));
   } else if (ev.id === 'clean_wind') {
-    add('use_now', 'Use the extra power today', '+' + c.WIND_BONUS_CELLS + ' cells today', 'Gone at sunset');
-    add('polish', 'Send someone to polish the panels', '+' + c.WIND_POLISH_CELLS + ' cell for ' + c.WIND_POLISH_SOLS + ' sols', 'Extra dose. Job dropped', outPick('polish', 1));
-    add('let_go', 'Let it go', 'Costs nothing', 'The panels get dusty again');
+    add('use_now', t('rules.useTheExtraPowerToday'), t('rules.cellsToday', { windBonusCells: c.WIND_BONUS_CELLS }), t('rules.goneAtSunset'));
+    add('polish', t('rules.sendSomeoneToPolishThe'), t('rules.cellForSols', { windPolishCells: c.WIND_POLISH_CELLS, windPolishSols: c.WIND_POLISH_SOLS }), t('rules.extraDoseJobDropped'), outPick('polish', 1));
+    add('let_go', t('rules.letItGo'), t('rules.costsNothing'), t('rules.thePanelsGetDustyAgain'));
   } else if (ev.kind === 'chance') {
     const sci = s.crew.find((p) => p.role === 'scientist'), want = c.SYSTEMS.lab.want;
     const labOk = isUnlocked(s, 'lab') && s.plan.cells.lab >= want, sciOk = !!sci && sci.medbay <= 0;
-    add('outside', 'Go outside for it', 'Discovery card and a sample', 'Extra dose. Job dropped', outPick('chance', 1));
-    add('scan', 'Scan it from the lab', 'Discovery card, nobody goes outside', 'Needs ' + want + ' lab cells and ' + (sci ? sci.name : 'the scientist') + "'s day",
-      { enabled: labOk && sciOk, why: !labOk ? 'The lab has no power. Go back to the plan.' : 'The scientist is in the medbay' });
-    add('let_go', 'Let it go', 'Costs nothing', 'The chance is gone by morning');
+    add('outside', t('rules.goOutsideForIt'), t('rules.discoveryCardAndASample'), t('rules.extraDoseJobDropped'), outPick('chance', 1));
+    add('scan', t('rules.scanItFromTheLab'), t('rules.discoveryCardNobodyGoesOutside'), t('rules.needsLabCellsAndS', { want, scientist: (sci ? sci.name : t('rules.theScientist')) }),
+      { enabled: labOk && sciOk, why: !labOk ? t('rules.theLabHasNoPower') : t('rules.theScientistIsInThe') });
+    add('let_go', t('rules.letItGo'), t('rules.costsNothing'), t('rules.theChanceIsGoneBy'));
   }
   return out;
 }
