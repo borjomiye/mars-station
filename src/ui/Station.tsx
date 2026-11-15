@@ -174,7 +174,7 @@ export function Station({ s, height, selected, onSelect, onJob, overlay, notes }
         if (!list.length) return null;
         const r = id === 'outside' ? { x: -GUTTER + 6, y: GROUND - 150, w: GUTTER + 10, h: 100 } : board.rooms[id];
         return (
-          <ul key={id} className="st-notes" style={{ left: X(r.x + r.w / 2), top: Y(r.y) + (id === 'greenhouse' ? 44 : 30) }} aria-label={id === 'outside' ? 'Outside' : board.rooms[id].name}>
+          <ul key={id} className={`st-notes${id === 'outside' ? ' st-notes--edge' : ''}`} style={{ left: id === 'outside' ? 8 : X(r.x + r.w / 2), top: Y(r.y) + (id === 'greenhouse' ? 44 : 30) }} aria-label={id === 'outside' ? 'Outside' : board.rooms[id].name}>
             {list.map((n, i) => (
               <li key={i} className={`st-note ${n.tone}`} style={{ animationDelay: `${(k * 3 + i) * 0.18}s` }}>
                 <img src={icon(n.icon)} alt="" />{n.text}

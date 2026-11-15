@@ -382,7 +382,8 @@ button.corner-btn:active:not(:disabled) { transform: translateY(2px); box-shadow
 .corner-btn:hover .corner-tip, .corner-btn:focus-visible .corner-tip { opacity: 1; }
 .htp-steps { margin: 0; list-style: none; }
 .title button:focus-visible, .name-field:focus-within { outline: 3px solid var(--energy); outline-offset: 3px; }
-.htp-steps li { display: flex; align-items: center; gap: 12px; }
+.htp-steps li { display: flex; align-items: flex-start; gap: 12px; font-size: 21px; line-height: 1.25; }
+.htp-steps li b { color: var(--accent); font-weight: 400; }
 
 /* ---------- event ---------- */
 .event .screen-bg { object-position: center 60%; }
@@ -482,6 +483,7 @@ button.pick:hover .pick-tip, button.pick:focus-visible .pick-tip { display: bloc
   font: 400 21px var(--font-body); color: var(--text); background: var(--chip-bg); box-shadow: 0 0 0 2px var(--outline), 0 3px 0 2px var(--outline);
   animation: note-pop 0.45s ease-out both;
 }
+.st-notes--edge { transform: none; justify-items: start; max-width: calc(100% - 16px); }
 .st-note img { width: 20px; height: 20px; object-fit: contain; }
 .st-note.good { background: var(--note-good); }
 .st-note.bad { background: var(--note-bad); }

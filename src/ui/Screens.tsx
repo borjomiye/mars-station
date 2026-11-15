@@ -93,9 +93,14 @@ export function TitleScreen(p: TitleProps) {
               <button className="secondary small" data-sfx="close" onClick={() => setHelp(false)} aria-label="Close" autoFocus>X</button>
             </div>
             <ol className="overlay-body htp-steps">
-              <li><span className="step-num">1</span>[Placeholder] Read the morning report for the sol.</li>
-              <li><span className="step-num">2</span>[Placeholder] Make your decisions for the station.</li>
-              <li><span className="step-num">3</span>[Placeholder] Keep all five safe until sol 15.</li>
+              <li><span className="step-num">1</span><div><b>Goal.</b> Keep all five crew alive until sol 15. If air or food stays at zero for two sols, the mission ends.</div></li>
+              <li><span className="step-num">2</span><div><b>Morning.</b> Read the sky. Clear, hazy or dusty weather decides how many power cells the solar panels give today. A solar storm raises radiation.</div></li>
+              <li><span className="step-num">3</span><div><b>Plan.</b> Share the power cells between life support, shield, greenhouse, radio and lab. Not enough cells for a system means it works badly or not at all. Then give each person a job.</div></li>
+              <li><span className="step-num">4</span><div><b>Jobs.</b> One job per person per sol. Specialists do their own job twice as well. Fixing and going outside are heavy: two sols in a row make a person tired, and a tired person who works hard gets hurt.</div></li>
+              <li><span className="step-num">5</span><div><b>Event.</b> Each sol brings trouble to fix or a chance to take. Every choice costs something, so read before you pick.</div></li>
+              <li><span className="step-num">6</span><div><b>Results and radio.</b> See what changed and why. Send one message to Earth each night; the answer comes in the morning.</div></li>
+              <li><span className="step-num">7</span><div><b>Radiation.</b> Dose only goes up. A trip outside adds more, and a storm multiplies it. A red badge grounds that person for good.</div></li>
+              <li><span className="step-num">8</span><div><b>Stars.</b> One star for surviving, one for enough science from album cards, one for a healthy crew with green badges.</div></li>
             </ol>
           </div>
         </div>
