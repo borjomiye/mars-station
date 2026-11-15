@@ -2,9 +2,10 @@
 import {
   badgeOf, cards, cellsAvailable, cfg, crewById, currentEvent, donki, doseFor, effectiveCells, endMission, eventChoices, fmt, fmt2, getPeriod,
   MODES, messageOptions, planTotal, plural, problemNeed, stormOn, workPower,
-  type GameState, type Mode, type RadioMessageId, type RealEvent,
+  type CardKind, type GameState, type Mode, type RadioMessageId, type RealEvent,
 } from '../engine';
-import { crewArt, eventScene, icon, patchArt, robotArt, scene } from './art';
+import { useState } from 'react';
+import { cardPhoto, crewArt, eventScene, icon, robotArt, scene } from './art';
 import { CrewCard, badgeIcon } from './bits';
 
 // ---------- title ----------
@@ -233,16 +234,50 @@ export function ReportScreen({ s, album, onAgain, onNew }: { s: GameState; album
 
 // ---------- windows ----------
 
+const KIND_NAME: Record<CardKind, string> = { chance: 'Mars find', lab: 'Lab find', milestone: 'Milestone' };
+
+/** Found cards show their real NASA photo; a click opens the photo with its fact and sources. */
 export function AlbumView({ album }: { album: string[] }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const card = open ? cards.find((k) => k.id === open) : undefined;
+  if (card) {
+    const photoLink = `https://images.nasa.gov/details/${card.photo.nasaId}`;
+    const sameSource = card.link === photoLink;
+    return (
+      <div className="album-detail">
+        <img className="album-photo" src={cardPhoto(card.id)} alt={card.photo.alt} />
+        <div className="album-text">
+          <span className="muted">{KIND_NAME[card.kind]}</span>
+          <h3>{card.title}</h3>
+          <p>{card.fact}</p>
+          {sameSource ? (
+            <p className="muted album-source">Photo and fact: {card.photo.credit} · <a href={photoLink} target="_blank" rel="noreferrer">NASA Image Library</a></p>
+          ) : (
+            <>
+              <p className="muted album-source">Fact: <a href={card.link} target="_blank" rel="noreferrer">{card.source}</a></p>
+              <p className="muted album-source">Photo: {card.photo.credit} · <a href={photoLink} target="_blank" rel="noreferrer">NASA Image Library</a></p>
+            </>
+          )}
+          <button className="secondary" onClick={() => setOpen(null)}>◀ Back to album</button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="album-grid">
       {cards.map((k) => {
         const has = album.includes(k.id);
-        return (
-          <div key={k.id} className={`album-card${has ? ' found' : ''}`}>
-            <img src={has ? patchArt('emblem-rocket') : icon('card-back')} alt="" />
-            <b>{has ? k.title : '???'}</b>
-            <span className="muted">{has ? k.kind : k.hint}</span>
+        return has ? (
+          <button key={k.id} className="album-card found" onClick={() => setOpen(k.id)} aria-label={`${k.title}: open the photo and fact`}>
+            <img className="album-thumb" src={cardPhoto(k.id)} alt={k.photo.alt} loading="lazy" />
+            <b>{k.title}</b>
+            <span className="muted">{KIND_NAME[k.kind]}</span>
+          </button>
+        ) : (
+          <div key={k.id} className="album-card">
+            <img src={icon('card-back')} alt="" />
+            <b>???</b>
+            <span className="muted">{k.hint}</span>
           </div>
         );
       })}
@@ -258,7 +293,7 @@ export function DataView({ periodId }: { periodId?: string }) {
       <p>Solar flares, plasma clouds and solar particle storms come from NASA DONKI. Each one really happened on the date shown. Most were seen from near Earth: the game pretends they reached our station.</p>
       <p>The normal dose of {c.DOSE_INDOOR_PER_SOL} mSv per sol follows the Curiosity rover's RAD instrument (Hassler et al., Science 2014). In a storm the game multiplies it by {c.STORM_MULT_BY_DAY.join(' and ')}.</p>
       <p className="muted">Game values, not NASA limits: the badge turns amber at {c.BADGE_AMBER_MSV} mSv and red at {c.BADGE_RED_MSV} mSv. Crops, repairs and the 15-sol mission are sped up.</p>
-      <p className="muted">The pictures are drawn for the game; they are not NASA photos.</p>
+      <p className="muted">The station, the crew and the robot are drawn for the game. The photos on album cards are real NASA images, each with its credit. Lab and health cards come from studies in NASA's Open Science Data Repository (OSDR); every card links to its source.</p>
       <p className="muted">{donki.source}</p>
       {period && (
         <>

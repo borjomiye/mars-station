@@ -11,6 +11,8 @@ const robot = pick(import.meta.glob('../assets/robot/*.png', { eager: true, impo
 const scenes = pick(import.meta.glob('../assets/scenes/*.jpg', { eager: true, import: 'default' }));
 const station = pick(import.meta.glob('../assets/station/*.png', { eager: true, import: 'default' }));
 const patch = pick(import.meta.glob('../assets/patch/*.png', { eager: true, import: 'default' }));
+// Real NASA photos for the album cards (P4): src/assets/cards/<card id>.jpg. Only URLs here; a photo loads when the album shows it.
+const cardPhotos = pick(import.meta.glob('../assets/cards/*.jpg', { eager: true, import: 'default' }));
 
 const need = (set: Record<string, string>, name: string): string => {
   const url = set[name];
@@ -23,6 +25,7 @@ export const robotArt = (name: string) => need(robot, name);
 export const scene = (name: string) => need(scenes, name);
 export const stationArt = (name: string) => need(station, name);
 export const patchArt = (name: string) => need(patch, name);
+export const cardPhoto = (cardId: string) => need(cardPhotos, cardId);
 
 // ---------- Station board layout (src/assets/station/board.json) ----------
 

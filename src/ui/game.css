@@ -403,6 +403,14 @@ button.pick b { font-size: 22px; }
 .album-card { display: grid; justify-items: center; gap: 4px; padding: 10px; text-align: center; background: var(--panel-2); border-radius: var(--radius); box-shadow: 0 0 0 2px var(--outline); font-size: 20px; }
 .album-card img { width: 56px; height: auto; }
 .album-card.found { box-shadow: 0 0 0 3px var(--energy); }
+button.album-card { font: inherit; color: inherit; border: 0; cursor: pointer; min-height: 44px; }
+button.album-card:hover, button.album-card:focus-visible { outline: 3px solid var(--energy); outline-offset: 2px; }
+.album-card img.album-thumb { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 4px; }
+.album-detail { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.album-photo { width: 100%; max-height: 460px; object-fit: contain; background: #000; border-radius: var(--radius); }
+.album-text { display: grid; gap: 10px; justify-items: start; }
+.album-text h3, .album-text p { margin: 0; }
+.album-source { font-size: 18px; }
 .data-view { display: grid; gap: 10px; }
 .data-view p { margin: 0; }
 .data-view ul { margin: 0; padding-left: 20px; font-size: 20px; }

@@ -55,7 +55,12 @@ export type ProblemDef = {
 };
 export type TroubleDef = { title: string; line: string; problem?: string };
 export type ChanceDef = { title: string; line: string; card: string | null };
-export type CardDef = { id: string; title: string; kind: CardKind; hint: string };
+/** A real NASA photo for a card; the image file is src/assets/cards/<card id>.jpg. */
+export type CardPhoto = { nasaId: string; alt: string; credit: string };
+/** Album card. fact/source/link are resolved in content.ts (from the card itself or from facts.json). */
+export type CardDef = { id: string; title: string; kind: CardKind; hint: string; fact: string; source: string; link: string; photo: CardPhoto };
+/** A space biology fact from NASA OSDR (src/data/facts.json). */
+export type Fact = { id: string; osd: string; study: string; text: string; link: string };
 export type CrewDef = { id: string; name: string; role: Role };
 
 // ---------- Game state ----------
