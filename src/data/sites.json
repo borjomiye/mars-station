@@ -1,14 +1,66 @@
 {
-  "_note": "Should-scope: more sites later. Owner: P4. Images from Mars Trek go to src/assets with credit.",
+  "_note": "Landing sites. The mission name picks one (same name = same site). `patch` changes balance numbers for this mission only: `add` adds to a number, `set` replaces it; dotted paths reach inside objects (CELLS_BY_WEATHER.clear). Every site has a plus and a minus. Facts are on the site's album card (cards.json). Owner: P4 + P5.",
   "sites": [
     {
+      "id": "gale",
+      "name": "Gale Crater",
+      "where": "5° south of the equator",
+      "plus": "Near the equator: 1 more cell on clear and hazy sols",
+      "minus": "No ice under the ground: start with less air & water",
+      "card": "site_gale",
+      "patch": {
+        "add": {
+          "CELLS_BY_WEATHER.clear": 1,
+          "CELLS_BY_WEATHER.hazy": 1,
+          "AIR_START": -1
+        }
+      }
+    },
+    {
       "id": "jezero",
-      "nameKey": "site.jezero",
-      "lat": 18.38,
-      "lon": 77.58,
-      "solarMult": 1.0,
-      "doseMult": 1.0,
-      "hasIce": false
+      "name": "Jezero Crater",
+      "where": "an old lake with a river delta",
+      "plus": "Rich old lake rocks: trips outside bring more samples",
+      "minus": "Farther from the equator: 1 cell less on hazy sols",
+      "card": "site_jezero",
+      "patch": {
+        "add": {
+          "JOB_OUTPUT.outside": 0.5,
+          "CHANCE_SAMPLES": 1,
+          "CELLS_BY_WEATHER.hazy": -1
+        }
+      }
+    },
+    {
+      "id": "utopia",
+      "name": "Utopia Planitia",
+      "where": "a plain halfway to the north pole",
+      "plus": "Ice under the ground: start with full air & water",
+      "minus": "Far from the equator: 1 cell less on clear sols",
+      "card": "site_utopia",
+      "patch": {
+        "add": {
+          "AIR_START": 2,
+          "CELLS_BY_WEATHER.clear": -1
+        }
+      }
+    },
+    {
+      "id": "hellas",
+      "name": "Hellas Basin",
+      "where": "the deepest basin on Mars",
+      "plus": "Thick air overhead: less radiation every sol (game estimate)",
+      "minus": "Dust storms love Hellas: 1 cell less on dusty sols",
+      "card": "site_hellas",
+      "patch": {
+        "set": {
+          "DOSE_INDOOR_PER_SOL": 0.5,
+          "DOSE_OUTSIDE_TRIP": 0.8
+        },
+        "add": {
+          "CELLS_BY_WEATHER.dust": -1
+        }
+      }
     }
   ]
 }

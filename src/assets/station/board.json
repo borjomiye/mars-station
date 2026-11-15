@@ -1,0 +1,146 @@
+{
+    "_note":  "Station board layout in board pixels (station-board.png is the same size). Rooms are the open windows; slots are where a crew member\u0027s feet go (anchor bottom-centre). Scale everything together.",
+    "board":  {
+                  "w":  1600,
+                  "h":  448,
+                  "groundY":  444
+              },
+    "layers":  {
+                   "module-left":  {
+                                       "y":  159,
+                                       "w":  630,
+                                       "h":  285,
+                                       "x":  24
+                                   },
+                   "module-right":  {
+                                        "y":  64,
+                                        "w":  630,
+                                        "h":  380,
+                                        "x":  946
+                                    },
+                   "dome":  {
+                                "y":  6,
+                                "w":  398,
+                                "h":  438,
+                                "x":  614
+                            }
+               },
+    "layerOrder":  [
+                       "module-left",
+                       "module-right",
+                       "dome"
+                   ],
+    "crewHeight":  116,
+    "rooms":  {
+                  "lab":  {
+                              "name":  "Lab",
+                              "system":  "lab",
+                              "x":  114,
+                              "y":  197,
+                              "w":  234,
+                              "h":  194,
+                              "label":  {
+                                            "x":  231,
+                                            "y":  203
+                                        },
+                              "slots":  [
+                                            {
+                                                "x":  194,
+                                                "y":  377
+                                            },
+                                            {
+                                                "x":  268,
+                                                "y":  377
+                                            }
+                                        ]
+                          },
+                  "medbay":  {
+                                 "name":  "Medbay \u0026 shelter",
+                                 "system":  "shield",
+                                 "x":  373,
+                                 "y":  197,
+                                 "w":  229,
+                                 "h":  194,
+                                 "label":  {
+                                               "x":  488,
+                                               "y":  203
+                                           },
+                                 "slots":  [
+                                               {
+                                                   "x":  451,
+                                                   "y":  377
+                                               },
+                                               {
+                                                   "x":  524,
+                                                   "y":  377
+                                               }
+                                           ]
+                             },
+                  "greenhouse":  {
+                                     "name":  "Greenhouse",
+                                     "system":  "greenhouse",
+                                     "x":  647,
+                                     "y":  129,
+                                     "w":  332,
+                                     "h":  251,
+                                     "label":  {
+                                                   "x":  813,
+                                                   "y":  135
+                                               },
+                                     "slots":  [
+                                                   {
+                                                       "x":  760,
+                                                       "y":  355
+                                                   },
+                                                   {
+                                                       "x":  866,
+                                                       "y":  355
+                                                   }
+                                               ]
+                                 },
+                  "workshop":  {
+                                   "name":  "Workshop",
+                                   "system":  "life",
+                                   "x":  1036,
+                                   "y":  197,
+                                   "w":  234,
+                                   "h":  194,
+                                   "label":  {
+                                                 "x":  1153,
+                                                 "y":  203
+                                             },
+                                   "slots":  [
+                                                 {
+                                                     "x":  1116,
+                                                     "y":  377
+                                                 },
+                                                 {
+                                                     "x":  1190,
+                                                     "y":  377
+                                                 }
+                                             ]
+                               },
+                  "radio":  {
+                                "name":  "Radio",
+                                "system":  "radio",
+                                "x":  1295,
+                                "y":  197,
+                                "w":  229,
+                                "h":  194,
+                                "label":  {
+                                              "x":  1410,
+                                              "y":  203
+                                          },
+                                "slots":  [
+                                              {
+                                                  "x":  1373,
+                                                  "y":  377
+                                              },
+                                              {
+                                                  "x":  1446,
+                                                  "y":  377
+                                              }
+                                          ]
+                            }
+              }
+}

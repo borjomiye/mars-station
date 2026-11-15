@@ -1,16 +1,28 @@
-// Downloads real NASA DONKI events (SEP, FLR, CME), cuts them into 15-day periods and writes
+// Downloads real NASA DONKI events (SEP, FLR, CME), picks playable 15-day periods and writes
 // src/data/donki-periods.json. Run once by the data owner (P4); the game never calls the API.
 //
 // Usage:
-//   npm run fetch:donki -- [startDate=2020-01-01] [endDate=2025-12-31] [--dry] [--api-nasa]
-//   --dry       only prints storm statistics per window, does not write the file
+//   npm run fetch:donki -- [startDate=2013-01-01] [endDate=2026-10-31] [--dry] [--api-nasa] [--refresh]
+//   --dry       only prints statistics and the chosen periods, does not write the file
 //   --api-nasa  use api.nasa.gov (needs NASA_API_KEY in .env) instead of the CCMC web service
+//   --refresh   ignore the local download cache (node_modules/.cache/donki-*.json)
 //
 // Default source: NASA CCMC DONKI web service (ccmc.gsfc.nasa.gov/DONKI/WS), the origin of the
 // api.nasa.gov DONKI endpoints. No key needed, max 60 days per request.
 // Note (Nov 2026): api.nasa.gov/DONKI/FLR returned 404, so flares always come from CCMC.
 // GST (geomagnetic storms) are skipped on purpose: they are about Earth's magnetic field, Mars has none.
-import { existsSync, writeFileSync } from 'node:fs';
+//
+// How periods are picked (so every period in the file is playable by src/engine/schedule.ts):
+// - A storm day is a day with an OBSERVED solar particle event. SEP entries that only come from a
+//   forecast model (instrument "MODEL: ...") are skipped: the game says "seen from near Earth".
+// - Stormy period: a 15-day window (any start date) with 1..MAX_STORM_DAYS storm days, all of them
+//   on sols STORM_MIN_SOL..STORM_MAX_SOL (numbers read from balance.json). For each storm the
+//   window start is chosen among the valid ones by a hash of the date, so storms land on varied sols.
+// - Calm period: a window with no storm day but at least one M/X flare or fast/Mars CME.
+//   Windows with an X flare or a CME aimed at Mars come first, then they are spread over the years.
+// - Each day keeps at most MAX_EVENTS_PER_DAY events (storm, Mars CME, X flare, CME, M flare).
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import balance from '../src/data/balance.json';
 import type { DonkiEvent, DonkiFile, DonkiPeriod } from '../src/engine/types';
 
 if (existsSync('.env')) process.loadEnvFile('.env');
@@ -18,16 +30,30 @@ const KEY = process.env.NASA_API_KEY ?? 'DEMO_KEY';
 const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const DRY = process.argv.includes('--dry');
 const USE_API_NASA = process.argv.includes('--api-nasa');
-const START = args[0] ?? '2020-01-01';
-const END = args[1] ?? '2025-12-31';
-const WINDOW_DAYS = 15;
+const REFRESH = process.argv.includes('--refresh');
+const START = args[0] ?? '2013-01-01';
+const END = args[1] ?? '2026-10-31';
+const WINDOW_DAYS: number = balance.base.MISSION_SOLS;
+const STORM_MIN_SOL: number = balance.base.STORM_MIN_SOL;
+const STORM_MAX_SOL: number = balance.base.STORM_MAX_SOL;
 const CHUNK_DAYS = 30; // CCMC allows at most 60 days per request
 const OUT = 'src/data/donki-periods.json';
+const CACHE_DIR = 'node_modules/.cache';
 const DAY = 86_400_000;
 
-const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
+// Filters keep the game readable: one morning line per notable event, not hundreds.
+const MIN_CME_SPEED = 1000; // km/s: fast CMEs, or any CME the ENLIL model sends to Mars
+const STRONG_FLARE = /^[MX]/; // M and X class flares only
+const MAX_STORM_DAYS = Number(process.env.MAX_STORM_DAYS ?? 3); // more storm days per 15 sols is unwinnable
+const MAX_EVENTS_PER_DAY = 3; // the game shows at most MAX_REAL_EVENTS_PER_SOL of them
+const MAX_STORMY = Number(process.env.MAX_STORMY ?? 40);
+const MAX_CALM = Number(process.env.MAX_CALM ?? 15);
 
-type RawSep = { sepID: string; eventTime: string; link: string };
+const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
+const addDays = (date: string, n: number) => iso(Date.parse(date) + n * DAY);
+const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / DAY);
+
+type RawSep = { sepID: string; eventTime: string; link: string; instruments?: { displayName?: string }[] | null };
 type RawFlr = { flrID: string; beginTime: string; peakTime?: string; classType?: string; link: string };
 type RawCme = {
   activityID: string;
@@ -41,29 +67,32 @@ async function get<T>(type: 'SEP' | 'FLR' | 'CME', start: string, end: string): 
     USE_API_NASA && type !== 'FLR'
       ? `https://api.nasa.gov/DONKI/${type}?startDate=${start}&endDate=${end}&api_key=${KEY}`
       : `https://ccmc.gsfc.nasa.gov/DONKI/WS/get/${type}?startDate=${start}&endDate=${end}`;
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  for (let attempt = 1; attempt <= 5; attempt++) {
     const res = await fetch(url);
     if (res.ok) {
       const text = await res.text();
       return text.trim() ? (JSON.parse(text) as T[]) : [];
     }
-    console.warn(`  ${type} ${start}..${end}: HTTP ${res.status} (attempt ${attempt})`);
-    if (res.status === 429) throw new Error('Rate limit hit. Use your own NASA_API_KEY in .env.');
-    await new Promise((r) => setTimeout(r, 2000 * attempt));
+    // 429 also happens with an own key (short burst limit); remaining quota is in X-Ratelimit-Remaining.
+    const left = res.headers.get('x-ratelimit-remaining');
+    console.warn(`  ${type} ${start}..${end}: HTTP ${res.status} (attempt ${attempt}${left ? `, quota left ${left}` : ''})`);
+    if (res.status === 429 && KEY === 'DEMO_KEY') throw new Error('Rate limit hit. Use your own NASA_API_KEY in .env.');
+    await new Promise((r) => setTimeout(r, (res.status === 429 ? 15_000 : 2000) * attempt));
   }
   throw new Error(`Failed to fetch ${type} ${start}..${end}`);
 }
 
-// Filters keep the game readable: one morning line per notable event, not hundreds.
-const MIN_CME_SPEED = 1000; // km/s: fast CMEs, or any CME the ENLIL model sends to Mars
-const STRONG_FLARE = /^[MX]/; // M and X class flares only
-const MAX_STORM_DAYS = Number(process.env.MAX_STORM_DAYS ?? 3); // more storm days per 15 sols is unwinnable
+const isModelOnly = (e: RawSep) => {
+  const names = (e.instruments ?? []).map((i) => i.displayName ?? '');
+  return names.length > 0 && names.every((n) => n.startsWith('MODEL'));
+};
 
 function toEvents(sep: RawSep[], flr: RawFlr[], cme: RawCme[]): DonkiEvent[] {
   const out: DonkiEvent[] = [];
   // DONKI lists one SEP per instrument/threshold; the game needs one storm per day.
   const sepDays = new Set<string>();
   for (const e of sep) {
+    if (isModelOnly(e)) continue;
     const date = e.eventTime.slice(0, 10);
     if (sepDays.has(date)) continue;
     sepDays.add(date);
@@ -81,64 +110,146 @@ function toEvents(sep: RawSep[], flr: RawFlr[], cme: RawCme[]): DonkiEvent[] {
     if (!marsImpact && (best?.speed ?? 0) < MIN_CME_SPEED) continue;
     out.push({ id: e.activityID, type: 'CME', date: e.startTime.slice(0, 10), time: e.startTime, speed: best?.speed, marsImpact, link: e.link });
   }
-  return out.sort((a, b) => (a.time ?? a.date).localeCompare(b.time ?? b.date));
+  return out;
 }
 
-async function main() {
+// Same order as rank() in src/engine/schedule.ts, then by flare class.
+const rank = (e: DonkiEvent): number =>
+  e.type === 'SEP' ? 0 : e.marsImpact ? 1 : e.type === 'FLR' && (e.classType ?? '').startsWith('X') ? 2 : e.type === 'CME' ? 3 : 4;
+const flareSize = (e: DonkiEvent) => (e.type === 'FLR' ? Number((e.classType ?? '').slice(1)) || 0 : 0);
+
+function trimPerDay(events: DonkiEvent[]): DonkiEvent[] {
+  const byDay = new Map<string, DonkiEvent[]>();
+  for (const e of events) byDay.set(e.date, [...(byDay.get(e.date) ?? []), e]);
+  const kept: DonkiEvent[] = [];
+  for (const list of byDay.values()) kept.push(...list.sort((a, b) => rank(a) - rank(b) || flareSize(b) - flareSize(a)).slice(0, MAX_EVENTS_PER_DAY));
+  return kept.sort((a, b) => (a.time ?? a.date).localeCompare(b.time ?? b.date));
+}
+
+async function download(): Promise<DonkiEvent[]> {
+  const cache = `${CACHE_DIR}/donki-${START}-${END}.json`;
+  if (!REFRESH && existsSync(cache)) {
+    console.log(`Using cached download ${cache} (pass --refresh to download again)`);
+    return JSON.parse(readFileSync(cache, 'utf8')) as DonkiEvent[];
+  }
   console.log(`Fetching DONKI ${START}..${END} from ${USE_API_NASA ? `api.nasa.gov (key: ${KEY === 'DEMO_KEY' ? 'DEMO_KEY' : 'own key'}) + CCMC for flares` : 'CCMC DONKI web service'}`);
+  mkdirSync(`${CACHE_DIR}/donki-chunks`, { recursive: true });
   const all: DonkiEvent[] = [];
   for (let t = Date.parse(START); t <= Date.parse(END); t += CHUNK_DAYS * DAY) {
     const s = iso(t);
     const e = iso(Math.min(t + (CHUNK_DAYS - 1) * DAY, Date.parse(END)));
+    // Each 30-day chunk is cached too, so a run stopped by a network error resumes where it stopped.
+    const chunkFile = `${CACHE_DIR}/donki-chunks/${s}_${e}.json`;
+    if (!REFRESH && existsSync(chunkFile)) {
+      all.push(...(JSON.parse(readFileSync(chunkFile, 'utf8')) as DonkiEvent[]));
+      continue;
+    }
     const [sep, flr, cme] = await Promise.all([get<RawSep>('SEP', s, e), get<RawFlr>('FLR', s, e), get<RawCme>('CME', s, e)]);
     const kept = toEvents(sep, flr, cme);
     const count = (type: string) => kept.filter((x) => x.type === type).length;
-    console.log(`  ${s}..${e}: raw SEP ${sep.length}, FLR ${flr.length}, CME ${cme.length} -> kept storm days ${count('SEP')}, M/X flares ${count('FLR')}, fast/Mars CMEs ${count('CME')}`);
+    console.log(`  ${s}..${e}: raw SEP ${sep.length}, FLR ${flr.length}, CME ${cme.length} -> storm days ${count('SEP')}, M/X flares ${count('FLR')}, fast/Mars CMEs ${count('CME')}`);
+    writeFileSync(chunkFile, JSON.stringify(kept));
     all.push(...kept);
   }
+  writeFileSync(cache, JSON.stringify(all));
+  return all;
+}
 
-  // Cut into non-overlapping 15-day windows; keep only windows that have data.
-  const periods: DonkiPeriod[] = [];
-  const stormDayHistogram = new Map<number, number>();
-  let totalWindows = 0;
-  let tooStormy = 0;
-  for (let t = Date.parse(START); t + (WINDOW_DAYS - 1) * DAY <= Date.parse(END); t += WINDOW_DAYS * DAY) {
-    totalWindows++;
-    const start = iso(t);
-    const end = iso(t + (WINDOW_DAYS - 1) * DAY);
-    const events = all.filter((e) => e.date >= start && e.date <= end);
-    const stormDays = events.filter((e) => e.type === 'SEP').length; // already one per day
-    stormDayHistogram.set(stormDays, (stormDayHistogram.get(stormDays) ?? 0) + 1);
-    if (events.length === 0) continue;
-    if (stormDays > MAX_STORM_DAYS) {
-      tooStormy++;
-      continue;
-    }
-    periods.push({ id: `donki-${start}`, start, days: WINDOW_DAYS, kind: stormDays > 0 ? 'stormy' : 'calm', events });
+function hash(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+  return h >>> 0;
+}
+
+function makePeriod(start: string, all: DonkiEvent[], kind: DonkiPeriod['kind']): DonkiPeriod {
+  const end = addDays(start, WINDOW_DAYS - 1);
+  const events = trimPerDay(all.filter((e) => e.date >= start && e.date <= end));
+  return { id: `donki-${start}`, start, days: WINDOW_DAYS, kind, events };
+}
+
+function pickStormy(all: DonkiEvent[]): DonkiPeriod[] {
+  const stormDays = [...new Set(all.filter((e) => e.type === 'SEP').map((e) => e.date))].sort();
+  const sols = (start: string) => stormDays.map((d) => daysBetween(start, d) + 1).filter((s) => s >= 1 && s <= WINDOW_DAYS);
+  const valid = (start: string) => {
+    const s = sols(start);
+    return s.length >= 1 && s.length <= MAX_STORM_DAYS && s.every((x) => x >= STORM_MIN_SOL && x <= STORM_MAX_SOL);
+  };
+  // Candidate starts: every day from which some storm day lands on sol STORM_MIN_SOL..STORM_MAX_SOL.
+  const starts = new Set<string>();
+  for (const d of stormDays) for (let sol = STORM_MIN_SOL; sol <= STORM_MAX_SOL; sol++) starts.add(addDays(d, 1 - sol));
+  const ok = [...starts].filter((s) => s >= START && addDays(s, WINDOW_DAYS - 1) <= END && valid(s)).sort();
+  // Group valid starts that share the same first storm day; pick one start per group, no overlaps.
+  const groups = new Map<string, string[]>();
+  for (const s of ok) {
+    const first = stormDays.find((d) => d >= s)!;
+    groups.set(first, [...(groups.get(first) ?? []), s]);
   }
+  const picked: DonkiPeriod[] = [];
+  let lastEnd = '';
+  for (const [first, list] of [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const free = list.filter((s) => s > lastEnd);
+    if (!free.length) continue;
+    const start = free[hash(first) % free.length];
+    picked.push(makePeriod(start, all, 'stormy'));
+    lastEnd = addDays(start, WINDOW_DAYS - 1);
+  }
+  console.log(`Storm days (observed SEP): ${stormDays.length}; storms that fit sols ${STORM_MIN_SOL}-${STORM_MAX_SOL}: ${picked.length}`);
+  return picked;
+}
 
-  const stormy = periods.filter((p) => p.kind === 'stormy');
-  const calm = periods.filter((p) => p.kind === 'calm');
-  console.log(`\nWindows: ${totalWindows}, usable: ${periods.length}, stormy (1-${MAX_STORM_DAYS} storm days): ${stormy.length}, calm: ${calm.length}, dropped as too stormy: ${tooStormy}`);
-  console.log('Storm (SEP) days per window -> number of windows:');
-  for (const [n, c] of [...stormDayHistogram.entries()].sort((a, b) => a[0] - b[0])) console.log(`  ${n} days: ${c}`);
+function spread<T>(list: T[], n: number): T[] {
+  if (list.length <= n) return list;
+  return Array.from({ length: n }, (_, i) => list[Math.floor((i * list.length) / n)]);
+}
 
-  // Pool: all stormy windows + the same number of calm windows that still have flares/CMEs.
-  const calmPick = calm.filter((p) => p.events.length >= 1).slice(0, Math.max(stormy.length, 3));
-  const pool = [...stormy, ...calmPick].sort((a, b) => a.start.localeCompare(b.start));
+function pickCalm(all: DonkiEvent[], stormy: DonkiPeriod[]): DonkiPeriod[] {
+  const busy = (start: string, end: string) => stormy.some((p) => start <= addDays(p.start, p.days - 1) && end >= p.start);
+  const calm: DonkiPeriod[] = [];
+  for (let t = Date.parse(START); t + (WINDOW_DAYS - 1) * DAY <= Date.parse(END); t += WINDOW_DAYS * DAY) {
+    const start = iso(t);
+    const end = addDays(start, WINDOW_DAYS - 1);
+    if (busy(start, end)) continue;
+    const p = makePeriod(start, all, 'calm');
+    if (!p.events.length || p.events.some((e) => e.type === 'SEP')) continue;
+    calm.push(p);
+  }
+  const notable = (p: DonkiPeriod) => p.events.some((e) => e.marsImpact || (e.type === 'FLR' && (e.classType ?? '').startsWith('X')));
+  const best = calm.filter(notable);
+  const rest = calm.filter((p) => !notable(p));
+  console.log(`Calm windows with events: ${calm.length} (${best.length} with an X flare or a CME aimed at Mars)`);
+  return [...spread(best, MAX_CALM), ...spread(rest, Math.max(0, MAX_CALM - best.length))];
+}
+
+async function main() {
+  const all = await download();
+  // Keep every stormy window with an X flare (e.g. Sept 2017, May 2024), spread the rest over the years.
+  const allStormy = pickStormy(all);
+  const hasX = (p: DonkiPeriod) => p.events.some((e) => e.type === 'FLR' && (e.classType ?? '').startsWith('X'));
+  const xStormy = allStormy.filter(hasX).slice(0, MAX_STORMY);
+  const stormy = [...xStormy, ...spread(allStormy.filter((p) => !hasX(p)), MAX_STORMY - xStormy.length)];
+  const calm = pickCalm(all, stormy);
+  const pool = [...stormy, ...calm].sort((a, b) => a.start.localeCompare(b.start));
+
+  console.log('\nPeriods:');
+  for (const p of pool) {
+    const storms = p.events.filter((e) => e.type === 'SEP').map((e) => daysBetween(p.start, e.date) + 1);
+    const top = p.events.filter((e) => e.type === 'FLR').sort((a, b) => rank(a) - rank(b) || flareSize(b) - flareSize(a))[0];
+    console.log(`  ${p.id} ${p.kind.padEnd(6)} storm sols [${storms.join(',')}]  events ${p.events.length}${top ? `  top flare ${top.classType}` : ''}${p.events.some((e) => e.marsImpact) ? '  Mars CME' : ''}`);
+  }
+  console.log(`\n${pool.length} periods: ${stormy.length} stormy, ${calm.length} calm`);
 
   if (DRY) {
-    console.log(`\n--dry: would write ${pool.length} periods (${stormy.length} stormy, ${calmPick.length} calm). Nothing written.`);
+    console.log('--dry: nothing written.');
     return;
   }
   const file: DonkiFile = {
     stub: false,
     generatedAt: new Date().toISOString(),
-    source: `NASA DONKI (${USE_API_NASA ? "api.nasa.gov + " : ""}ccmc.gsfc.nasa.gov/DONKI), ${START}..${END}: SEP (one per day), M/X flares, CMEs >= ${MIN_CME_SPEED} km/s or aimed at Mars`,
+    source: `NASA DONKI (${USE_API_NASA ? 'api.nasa.gov + ' : ''}ccmc.gsfc.nasa.gov/DONKI), ${START}..${END}: observed SEP (one per day), M/X flares, CMEs >= ${MIN_CME_SPEED} km/s or aimed at Mars`,
     periods: pool,
   };
   writeFileSync(OUT, JSON.stringify(file, null, 2) + '\n');
-  console.log(`\nWrote ${pool.length} periods to ${OUT}`);
+  console.log(`Wrote ${pool.length} periods to ${OUT}`);
 }
 
 main().catch((err) => {

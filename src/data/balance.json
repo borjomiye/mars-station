@@ -1,22 +1,275 @@
 {
-  "_note": "All game numbers. Draft values: tune with `npm run simulate` and playtests. Owner: P5 (game design).",
-  "totalSols": 15,
-  "start": { "lifeSupport": 80, "food": 60, "hull": 100, "crewHealth": 100 },
-  "energy": { "baseCells": 10, "dustMult": 0.5, "maxCells": 12 },
-  "lifeSupport": { "perCell": 6, "perCrewPerSol": 4, "leakPerHullPoint": 0.25, "lowThreshold": 25, "lowHealthPenalty": 10 },
-  "food": { "perCell": 5, "perCrewPerSol": 2, "starvingHealthPenalty": 10 },
-  "shielding": { "perCell": 0.15, "max": 0.75 },
-  "comms": { "minCells": 1, "dustLossChance": 0.3, "forecastFromSol": 2, "forecastToSol": 3 },
-  "brokenSystemMult": 0.5,
-  "radiation": {
-    "_source": "Background: Curiosity RAD, Hassler et al., Science 2014 (doi:10.1126/science.1244797), ~0.64 mSv/day on the surface. VERIFY before demo. sepDoseMult is a game value.",
-    "backgroundMSvPerSol": 0.64,
-    "sepDoseMult": 20,
-    "evaMult": 1.5,
-    "shelterExposure": 0.25,
-    "stormHealthDamage": 60,
-    "doseLimitFor3Stars": 25
+  "_note": "All game numbers. Tune with `npm run simulate` and playtests. `base` = numbers shared by all modes (the schedule uses only these); `modes` = Easy / Medium / Hard overrides; `bot` = mistake chances of the sloppy test bot. Owner: P5 (game design).",
+  "_sources": {
+    "DOSE_INDOOR_PER_SOL": "Curiosity RAD: an average of 0.67 mSv per day on the surface, August 2012 to June 2013 (NASA news release 9 Dec 2013; Hassler et al., Science 343, 2014, doi:10.1126/science.1244797). Verified 2026-11-15, see src/data/radlab-iss.json.",
+    "STORM_MULT_BY_DAY": "Curiosity saw a 2-3x rise for about two days in Sept 2017 (NASA/JPL). Game value.",
+    "BADGE_AMBER_MSV": "Game thresholds, not NASA limits. Say so on the data screen.",
+    "SHIELD_DAILY_CUT": "Game simplification: thick shielding also blocks a little of the everyday cosmic-ray dose (it helps far less than against solar particle storms). Say so on the data screen."
   },
-  "health": { "dailyRecovery": 2, "medbayHealPerSol": 20, "medbayExitHealth": 70 },
-  "science": { "goal": 6 }
+  "base": {
+    "MISSION_SOLS": 15,
+    "ZERO_SOLS_TO_LOSE": 2,
+    "TANK_MAX": 10,
+    "AIR_START": 8,
+    "FOOD_START": 7,
+    "FOOD_EATEN_PER_SOL": 1,
+    "CELLS_BY_WEATHER": {
+      "clear": 9,
+      "hazy": 7,
+      "dust": 5
+    },
+    "SYSTEMS": {
+      "life": {
+        "name": "Life support",
+        "want": 3,
+        "max": 4,
+        "unlockSol": 1
+      },
+      "shield": {
+        "name": "Radiation shield",
+        "want": 3,
+        "max": 3,
+        "unlockSol": 2
+      },
+      "greenhouse": {
+        "name": "Greenhouse",
+        "want": 3,
+        "max": 3,
+        "unlockSol": 1
+      },
+      "radio": {
+        "name": "Radio",
+        "want": 1,
+        "max": 1,
+        "unlockSol": 3
+      },
+      "lab": {
+        "name": "Lab",
+        "want": 2,
+        "max": 2,
+        "unlockSol": 4
+      }
+    },
+    "TRIM_ORDER": [
+      "lab",
+      "radio",
+      "greenhouse",
+      "shield",
+      "life"
+    ],
+    "AIR_LOSS_PER_MISSING_CELL": 1,
+    "AIR_GAIN_PER_EXTRA_CELL": 1,
+    "BATTERY_CAPACITY": 0,
+    "CROP_STEPS_TO_HARVEST": 12,
+    "HARVEST_FOOD": 2,
+    "STEPS_PER_GREENHOUSE_CELL": 1,
+    "GROW_NEEDS_LIGHT": true,
+    "JOB_UNLOCK_SOL": 2,
+    "JOB_OUTPUT": {
+      "grow": 1,
+      "fix": 1,
+      "outside": 1,
+      "lab": 1,
+      "care": 0.5
+    },
+    "SPECIALIST_OF": {
+      "engineer": "fix",
+      "medic": "care",
+      "botanist": "grow",
+      "scientist": "lab",
+      "pilot": "outside"
+    },
+    "SPECIALIST_MULT": 2,
+    "HEAVY_JOBS": [
+      "fix",
+      "outside",
+      "rewire"
+    ],
+    "HEAVY_SOLS_TO_TIRED": 2,
+    "TIRED_EFFECT": 0.5,
+    "TIRED_HEAVY_WORK_INJURES": true,
+    "INJURY_MEDBAY_STEPS": 2,
+    "ILLNESS_MEDBAY_STEPS": 2,
+    "SICK_WORK_MEDBAY_STEPS": 3,
+    "MEDBAY_HEAL_PER_SOL": 1,
+    "SICK_REST_SOLS_TO_CURE": 2,
+    "SICK_EFFECT": 0.5,
+    "DOSE_INDOOR_PER_SOL": 0.67,
+    "DOSE_OUTSIDE_TRIP": 1,
+    "STORM_MULT_BY_DAY": [
+      3,
+      2
+    ],
+    "SHELTER_EXPOSURE": 0.5,
+    "BADGE_AMBER_MSV": 13,
+    "BADGE_RED_MSV": 15,
+    "RED_BADGE_GROUNDS": true,
+    "LAB_WORK_PER_SAMPLE": 2,
+    "CHANCE_SAMPLES": 1,
+    "SCIENCE_TARGET": 24,
+    "SCIENCE_PER_CARD": {
+      "chance": 3,
+      "lab": 2,
+      "milestone": 1
+    },
+    "BLACKOUT_SOLS": [
+      11,
+      12
+    ],
+    "RADIO_FORECAST_SOLS": 2,
+    "AUTO_FORECAST_SOLS": 0,
+    "PROBLEMS": {
+      "loose_pipe": {
+        "name": "Loose pipe",
+        "where": "inside",
+        "work": 1,
+        "airLeak": 1,
+        "growEvery": 2,
+        "maxSeverity": 3,
+        "airOnFix": 0
+      },
+      "pump_broken": {
+        "name": "Broken pump",
+        "where": "inside",
+        "work": 2,
+        "airLeak": 1,
+        "growEvery": 2,
+        "maxSeverity": 3,
+        "airOnFix": 1
+      },
+      "hull_crack": {
+        "name": "Hull crack",
+        "where": "outside",
+        "work": 2,
+        "airLeak": 1,
+        "growEvery": 2,
+        "maxSeverity": 3,
+        "airOnFix": 0
+      },
+      "lamp_fault": {
+        "name": "Lamp fault",
+        "where": "inside",
+        "work": 2,
+        "airLeak": 0,
+        "growEvery": 2,
+        "maxSeverity": 3,
+        "airOnFix": 0,
+        "growthFactor": [
+          0.5,
+          0.25,
+          0
+        ]
+      },
+      "antenna_off": {
+        "name": "Antenna off",
+        "where": "outside",
+        "work": 1,
+        "airLeak": 0,
+        "growEvery": 3,
+        "maxSeverity": 2,
+        "airOnFix": 0,
+        "blocksRadio": true
+      },
+      "dusty_panels": {
+        "name": "Dusty panels",
+        "where": "outside",
+        "work": 1,
+        "airLeak": 0,
+        "growEvery": 0,
+        "maxSeverity": 1,
+        "airOnFix": 0,
+        "cellsLost": 1
+      }
+    },
+    "WORK_PER_SEVERITY": 1,
+    "MIN_REPAIR_WORK": 0.5,
+    "TUTORIAL_TROUBLE_SOL": 2,
+    "TUTORIAL_TROUBLE": "loose_pipe",
+    "FIRST_CHANCE_SOL": 4,
+    "RANDOM_TROUBLES": 4,
+    "CHANCES_TOTAL": 4,
+    "TROUBLE_POOL": [
+      "hull_crack",
+      "pump_broken",
+      "sick_crew",
+      "lamp_fault",
+      "antenna_off",
+      "power_fault"
+    ],
+    "CHANCE_POOL": [
+      "striped_rock",
+      "dawn_frost",
+      "dust_devil",
+      "blue_sunset",
+      "clean_wind",
+      "phobos_eclipse",
+      "iron_meteorite",
+      "twilight_clouds"
+    ],
+    "HAZY_CHANCE": 0.4,
+    "CLEAR_UNTIL_SOL": 3,
+    "DUST_START_MIN": 9,
+    "DUST_START_MAX": 11,
+    "DUST_LEN_MIN": 2,
+    "DUST_LEN_MAX": 3,
+    "STORM_MIN_SOL": 5,
+    "STORM_MAX_SOL": 13,
+    "WIND_BONUS_CELLS": 2,
+    "WIND_POLISH_CELLS": 1,
+    "WIND_POLISH_SOLS": 4,
+    "THIRD_STAR_RULE": "both",
+    "HELPER_ALWAYS_ON": false,
+    "SHOW_MSV": true,
+    "STORMY_PERIOD_CHANCE": 0.9,
+    "MAX_REAL_EVENTS_PER_SOL": 2,
+    "START_DOSE": 0,
+    "TASKS_PER_MISSION": 2,
+    "SHIELD_DAILY_CUT": 0.3
+  },
+  "modes": {
+    "easy": {
+      "AIR_START": 9,
+      "FOOD_START": 9,
+      "ZERO_SOLS_TO_LOSE": 3,
+      "STORM_MULT_BY_DAY": [
+        2,
+        1.5
+      ],
+      "AUTO_FORECAST_SOLS": 1,
+      "HELPER_ALWAYS_ON": true,
+      "SHOW_MSV": false,
+      "SCIENCE_TARGET": 23
+    },
+    "medium": {
+      "AIR_START": 8,
+      "FOOD_START": 8,
+      "STORM_MULT_BY_DAY": [
+        2.5,
+        1.5
+      ],
+      "AUTO_FORECAST_SOLS": 1,
+      "HELPER_ALWAYS_ON": true,
+      "BADGE_AMBER_MSV": 12,
+      "BADGE_RED_MSV": 14
+    },
+    "hard": {
+      "AIR_START": 6,
+      "FOOD_START": 5,
+      "ZERO_SOLS_TO_LOSE": 1,
+      "SCIENCE_TARGET": 19,
+      "AIR_LOSS_PER_MISSING_CELL": 2,
+      "BADGE_AMBER_MSV": 10,
+      "BADGE_RED_MSV": 13
+    }
+  },
+  "bot": {
+    "lifeShort": 0.2,
+    "forgetShield": 0.5,
+    "ignoreTired": 0.5,
+    "ignoreSick": 0.4,
+    "stormTrip": 0.3,
+    "skipRepair": 0.35,
+    "skipChoice": 0.4,
+    "skipMessage": 0.4
+  }
 }

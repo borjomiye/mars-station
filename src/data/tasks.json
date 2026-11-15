@@ -1,0 +1,69 @@
+{
+  "_note": "Requests from Mission Control. The mission name picks TASKS_PER_MISSION of them. `check` is one of the checks in src/engine/tasks.ts; `by` is the last sol to do it; `reward` is extra science. Owner: P5.",
+  "tasks": [
+    {
+      "id": "first_harvest",
+      "check": "harvest",
+      "need": 1,
+      "by": 7,
+      "reward": 2,
+      "text": "Bring in your first harvest by sol {by}"
+    },
+    {
+      "id": "samples",
+      "check": "samples",
+      "need": 2,
+      "by": 10,
+      "reward": 2,
+      "text": "Collect {need} rock samples outside by sol {by}"
+    },
+    {
+      "id": "cards",
+      "check": "cards",
+      "need": 6,
+      "by": 9,
+      "reward": 2,
+      "text": "Find {need} discovery cards by sol {by}"
+    },
+    {
+      "id": "early_report",
+      "check": "report",
+      "need": 1,
+      "by": 6,
+      "reward": 2,
+      "text": "Send a science report to Earth by sol {by}"
+    },
+    {
+      "id": "forecast",
+      "check": "forecast",
+      "need": 1,
+      "by": 5,
+      "reward": 1,
+      "text": "Ask Earth for a space weather forecast by sol {by}"
+    },
+    {
+      "id": "air_high",
+      "check": "airAbove",
+      "need": 6,
+      "by": 10,
+      "reward": 2,
+      "text": "Keep air & water at {need} or more until sol {by}"
+    },
+    {
+      "id": "no_medbay",
+      "check": "noMedbay",
+      "need": 0,
+      "by": 10,
+      "reward": 2,
+      "text": "Nobody goes to the medbay until sol {by}"
+    },
+    {
+      "id": "green_badges",
+      "check": "greenBadges",
+      "need": 0,
+      "by": 14,
+      "reward": 2,
+      "text": "Keep every dose badge green until sol {by}"
+    }
+  ]
+}
