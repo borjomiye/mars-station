@@ -1,14 +1,16 @@
 import { t } from './text';
 import type { ChosenChoice, CrewMember, EffectiveJob, Forecast, GameState, MessageOption, Mode, Morning, Phase, Plan, RadioMessageId, RealEvent, ResultLine, SolRecord, Storm } from './types';
 import { MODES, SYSTEMS } from './types';
-import { cardDef, cards, cfg, crewDefs, words } from './content';
+import { cardDef, cards, cfg, crewDefs, siteDef, taskDef, twistDef, words } from './content';
+import { missionSetup, taskText, updateTasks } from './tasks';
+import { hashString } from './rng';
 import { buildSchedule, normSeed, prettyName } from './schedule';
 import {
   addProblem, badgeOf, cellsAvailable, clamp, clone, crewById, currentEvent, dayAt, doseFor, effectiveCells, effectiveJobs, enterMedbay, eventChoices,
   findCard, fmt, isBlackout, isUnlocked, jobAllowed, know, knownForecast, planTotal, plural, problemNeed, r3, radioBlocked, sanitizePlan, signed, stormOn, today, workPower,
 } from './rules';
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 /** The sol state machine: which phase may follow which. */
 export const TRANSITIONS: Record<Phase, Phase[]> = {
@@ -26,7 +28,7 @@ export function go(s: GameState, to: Phase): GameState {
 }
 
 function setSupply(s: GameState): void {
-  const c = cfg(s.mode), d = today(s);
+  const c = cfg(s), d = today(s);
   let v = c.CELLS_BY_WEATHER[d.weather];
   const notes = [t('sol.sky', { weather: d.weather, cells: v })];
   for (const p of s.problems) {
@@ -40,7 +42,7 @@ function setSupply(s: GameState): void {
 }
 
 function deliverAnswer(s: GameState, id: RadioMessageId): string {
-  const c = cfg(s.mode);
+  const c = cfg(s);
   if (id === 'forecast') {
     for (let k = 1; k <= c.RADIO_FORECAST_SOLS; k++) know(s, s.sol + k);
     return t('sol.earthSentTheSpaceWeather');
@@ -68,13 +70,23 @@ function deliverAnswer(s: GameState, id: RadioMessageId): string {
 
 /** Morning of the next sol. Mutates (called on a clone). */
 function nextSol(s: GameState): GameState {
-  const c = cfg(s.mode), prev = s.sol >= 1 ? today(s) : null, last = s.log[s.log.length - 1];
+  const c = cfg(s), prev = s.sol >= 1 ? today(s) : null, last = s.log[s.log.length - 1];
   if (s.sol >= 1) go(s, 'briefing'); else s.phase = 'briefing';
   s.sol++;
   const day = today(s), M: Morning = { lines: [], notes: [], answers: [], unlocked: [], words: [] };
   if (s.sol === 1) {
     M.lines.push(t('sol.landingDoneTheStationIs'));
+    if (s.siteId) {
+      const site = siteDef(s.siteId);
+      M.lines.push(t('sol.landedAt', { site: site.name, where: site.where }));
+      findCard(s, site.card);
+    }
     M.lines.push(t('sol.theShipHomeLandsOn', { missionSols: c.MISSION_SOLS }));
+    if (s.twistId) {
+      const tw = twistDef(s.twistId);
+      M.notes.push(t('sol.missionTwistName', { name: tw.name }), t('sol.twistGood', { plus: tw.plus }), t('sol.twistBad', { minus: tw.minus }));
+    }
+    for (const task of s.tasks) M.notes.push(t('sol.missionControlAsks', { task: taskText(taskDef(task.id)) }));
   } else {
     const steps = t('sol.ofSteps', { crop: fmt(s.crop), cropStepsToHarvest: c.CROP_STEPS_TO_HARVEST });
     M.lines.push(last && last.harvests ? t('sol.harvestCameInNewCrop', { steps }) : t('sol.greenhouseCropIsAt', { steps }));
@@ -94,6 +106,10 @@ function nextSol(s: GameState): GameState {
     else { for (const m of s.radio.queue) M.answers.push(deliverAnswer(s, m.id)); s.radio.queue = []; }
   }
   for (let k = 1; k <= c.AUTO_FORECAST_SOLS; k++) know(s, s.sol + k);
+  // Mission Control checks the tasks whose last sol has passed
+  for (const { def, task } of updateTasks(s, false)) {
+    M.notes.push(task.status === 'done' ? t('sol.taskDoneNote', { task: taskText(def), reward: def.reward }) : t('sol.taskMissedNote', { task: taskText(def) }));
+  }
   for (const k of SYSTEMS) if (c.SYSTEMS[k].unlockSol === s.sol && s.sol > 1) M.unlocked.push(c.SYSTEMS[k].name);
   if (s.sol === c.JOB_UNLOCK_SOL) M.unlocked.push(t('sol.crewJobs'));
   const word = (k: string) => { if (!s.seenWords.includes(k)) { s.seenWords.push(k); M.words.push(words[k]); } };
@@ -120,12 +136,16 @@ function nextSol(s: GameState): GameState {
   return s;
 }
 
-export function createMission(name: string, mode: Mode): GameState {
-  const m: Mode = MODES.includes(mode) ? mode : 'medium', seed = normSeed(name), c = cfg(m), sched = buildSchedule(seed);
+/** `setup` overrides what the mission name picks; '' = no landing site / no twist (plain numbers, used by the tests). */
+export function createMission(name: string, mode: Mode, setup: Partial<{ siteId: string; twistId: string; taskIds: string[] }> = {}): GameState {
+  const m: Mode = MODES.includes(mode) ? mode : 'medium', seed = normSeed(name), sched = buildSchedule(seed);
+  const pick = { ...missionSetup(seed), ...setup }, c = cfg({ mode: m, siteId: pick.siteId, twistId: pick.twistId });
+  const air = clamp(c.AIR_START, 0, c.TANK_MAX), startDose = c.START_DOSE ?? 0;
   const s: GameState = {
-    version: SAVE_VERSION, name: prettyName(name), seed, mode: m, periodId: sched.periodId, sol: 0, phase: 'briefing',
-    air: c.AIR_START, food: c.FOOD_START, crop: 0, samples: 0, labWork: 0, science: 0,
-    crew: crewDefs.map((d): CrewMember => ({ id: d.id, name: d.name, role: d.role, cond: 'fine', sick: false, sickRest: 0, medbay: 0, medbaySols: 0, medbayCause: '', dose: 0, stormExtra: 0, trips: 0, heavyStreak: 0, grounded: false })),
+    version: SAVE_VERSION, name: prettyName(name), seed, mode: m, siteId: pick.siteId, twistId: pick.twistId,
+    tasks: pick.taskIds.map((id) => ({ id, status: 'open', sol: null })), periodId: sched.periodId, sol: 0, phase: 'briefing',
+    air, food: clamp(c.FOOD_START, 0, c.TANK_MAX), crop: 0, samples: 0, labWork: 0, science: 0,
+    crew: crewDefs.map((d): CrewMember => ({ id: d.id, name: d.name, role: d.role, cond: 'fine', sick: false, sickRest: 0, medbay: 0, medbaySols: 0, medbayCause: '', dose: startDose, stormExtra: 0, trips: 0, heavyStreak: 0, grounded: false })),
     problems: [], uid: 0, schedule: sched.days,
     supply: 0, supplyNotes: [], battery: 0, panelBoost: null,
     plan: { cells: { life: c.SYSTEMS.life.want, shield: 0, greenhouse: c.SYSTEMS.greenhouse.want, radio: 0, lab: 0 }, jobs: {} },
@@ -133,7 +153,7 @@ export function createMission(name: string, mode: Mode): GameState {
     radio: { queue: [], sent: 0 }, known: [], cards: { found: [], sent: [] },
     morning: { lines: [], notes: [], answers: [], unlocked: [], words: [] }, lastResults: [], log: [], seenWords: [],
     flags: { panelsCovered: false, prefill: null },
-    counters: { airZero: 0, foodZero: 0, harvests: 0, medbaySols: 0 }, over: null,
+    counters: { airZero: 0, foodZero: 0, harvests: 0, medbaySols: 0, samples: 0, airLow: air }, over: null,
   };
   for (const p of s.crew) s.plan.jobs[p.id] = 'rest';
   return nextSol(s);
@@ -214,7 +234,7 @@ export function resolveEvent(state: GameState, choiceId: string, crewIds: string
 /** Runs the sol. Every result line names its cause. */
 export function playSol(state: GameState): { state: GameState; results: ResultLine[] } {
   if (state.phase !== 'plan' && state.phase !== 'event') return { state, results: [] };
-  const s = clone(state), c = cfg(s.mode), day = today(s), R: ResultLine[] = [];
+  const s = clone(state), c = cfg(s), day = today(s), R: ResultLine[] = [];
   const say = (t: string, why = '') => { R.push({ t, why }); };
   revealEvent(s);
   const ev = currentEvent(s);
@@ -279,6 +299,7 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
   for (const p of repair('outside', withJob('outside').filter((x) => !special(x.id)))) {
     const n = workPower(c, p, 'outside');
     s.samples = r3(s.samples + n);
+    s.counters.samples = r3(s.counters.samples + n);
     say(t('sol.samples', { amount: signed(n) }), t('sol.wentOutside', { name: p.name }));
   }
   for (const pr of s.problems) {
@@ -322,7 +343,9 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
       s.labWork = Math.max(0, r3(s.labWork - c.LAB_WORK_PER_SAMPLE));
       s.samples = r3(s.samples - 1);
       made = true;
-      const next = cards.find((k) => k.kind === 'lab' && !s.cards.found.includes(k.id));
+      // the mission name decides where in the list of lab finds this mission starts, so new missions bring new lab cards
+      const lab = cards.filter((k) => k.kind === 'lab'), start = hashString(s.seed + ':lab') % lab.length;
+      const next = [...lab.slice(start), ...lab.slice(0, start)].find((k) => !s.cards.found.includes(k.id));
       if (next) findCard(s, next.id, say, t('sol.studiedASample', { name: p.name }));
       else say(t('sol.sampleStudiedNothingNew'), t('sol.allLabCardsAreFound'));
     }
@@ -336,6 +359,7 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
       const p = crewById(s, picked[0]);
       findCard(s, ev.card, say, t('sol.wentOutsideForIt', { name: p.name }));
       s.samples = r3(s.samples + c.CHANCE_SAMPLES);
+      s.counters.samples = r3(s.counters.samples + c.CHANCE_SAMPLES);
       say(t('sol.samples2', { chanceSamples: signed(c.CHANCE_SAMPLES) }), t('sol.broughtOneBack', { name: p.name }));
     } else if (ch.id === 'scan') {
       if (labOn && withJob('scan').length) findCard(s, ev.card, say, t('sol.scannedItFromTheLab', { names: names(withJob('scan')) }));
@@ -449,6 +473,13 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
   else if (s.counters.foodZero >= c.ZERO_SOLS_TO_LOSE) s.over = { won: false, why: 'food' };
   else if (s.counters.airZero || s.counters.foodZero) say(t('sol.warningATankIsEmpty'), t('sol.oneMoreEmptySolEnds'));
 
+  // 14) Mission Control tasks
+  s.counters.airLow = Math.min(s.counters.airLow, s.air);
+  for (const { def, task } of updateTasks(s, true)) {
+    if (task.status === 'done') say(t('sol.taskDone', { reward: def.reward }), taskText(def));
+    else say(t('sol.taskMissed'), taskText(def));
+  }
+
   s.log.push(rec);
   s.lastResults = R;
   go(s, 'results');
@@ -463,11 +494,11 @@ export function previewSol(state: GameState): GameState {
 }
 
 export function radioCanSend(s: GameState): boolean {
-  const c = cfg(s.mode), last = s.log[s.log.length - 1];
+  const c = cfg(s), last = s.log[s.log.length - 1];
   return isUnlocked(s, 'radio') && !isBlackout(s) && !radioBlocked(s) && !!last && last.sol === s.sol && last.cells.radio >= c.SYSTEMS.radio.want;
 }
 export function radioOffReason(s: GameState): string {
-  const c = cfg(s.mode), last = s.log[s.log.length - 1];
+  const c = cfg(s), last = s.log[s.log.length - 1];
   if (!isUnlocked(s, 'radio')) return t('sol.theRadioOpensOnSol', { unlocksol: c.SYSTEMS.radio.unlockSol });
   if (isBlackout(s)) return t('sol.radioBlackoutTheSunIs');
   if (radioBlocked(s)) return t('sol.noRadioTheAntennaIs');
@@ -475,7 +506,7 @@ export function radioOffReason(s: GameState): string {
   return '';
 }
 export function messageOptions(s: GameState): MessageOption[] {
-  const c = cfg(s.mode), unsent = s.cards.found.filter((id) => !s.cards.sent.includes(id));
+  const c = cfg(s), unsent = s.cards.found.filter((id) => !s.cards.sent.includes(id));
   const firstBonus = s.radio.sent === 0 && !s.cards.found.includes('first_call') ? c.SCIENCE_PER_CARD.milestone : 0;
   const pts = unsent.reduce((a, id) => a + c.SCIENCE_PER_CARD[cardDef(id).kind], 0) + firstBonus;
   const ill = s.crew.some((p) => p.medbay > 0 || p.sick);
@@ -488,7 +519,7 @@ export function messageOptions(s: GameState): MessageOption[] {
 }
 
 function endOrNext(s: GameState): GameState {
-  if (s.sol >= cfg(s.mode).MISSION_SOLS) { s.over = { won: true, why: 'ship' }; return go(s, 'report'); }
+  if (s.sol >= cfg(s).MISSION_SOLS) { s.over = { won: true, why: 'ship' }; return go(s, 'report'); }
   return nextSol(s);
 }
 /** After the results: the evening call, the next morning, or the report. */
@@ -502,7 +533,7 @@ export function proceed(state: GameState): GameState {
 /** One message per sol (or null for none). Earth answers next morning. */
 export function sendMessage(state: GameState, messageId: RadioMessageId | null): GameState {
   if (state.phase !== 'radio') return state;
-  const s = clone(state), c = cfg(s.mode), opt = messageOptions(s).find((m) => m.id === messageId);
+  const s = clone(state), c = cfg(s), opt = messageOptions(s).find((m) => m.id === messageId);
   if (messageId && opt && opt.enabled) {
     if (s.radio.sent === 0) findCard(s, 'first_call');
     s.radio.sent++;
@@ -511,5 +542,5 @@ export function sendMessage(state: GameState, messageId: RadioMessageId | null):
     }
     s.radio.queue.push({ id: messageId, sol: s.sol });
   }
-  return endOrNext(s);
+  return endOrNext(s); // a report or forecast request sent tonight is counted for tasks next morning
 }

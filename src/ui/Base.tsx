@@ -55,7 +55,7 @@ function WhyWindow({ s, onClose }: { s: GameState; onClose: () => void }) {
 type PlanProps = { s: GameState; onCells: (k: SystemId, delta: number) => void; onJob: (crewId: string, job: Job) => void; onDone: () => void };
 
 export function PlanBase({ s, onCells, onJob, onDone }: PlanProps) {
-  const c = cfg(s.mode), avail = cellsAvailable(s), free = avail - planTotal(s.plan), st = stormOn(s), pv = previewSol(s);
+  const c = cfg(s), avail = cellsAvailable(s), free = avail - planTotal(s.plan), st = stormOn(s), pv = previewSol(s);
   const [selected, setSelected] = useState<string | null>(null);
   const [morning, setMorning] = useState(false);
   const [why, setWhy] = useState(false);
@@ -116,7 +116,7 @@ export function PlanBase({ s, onCells, onJob, onDone }: PlanProps) {
 }
 
 export function ResultsBase({ s, prev, onNext }: { s: GameState; prev: GameState | null; onNext: () => void }) {
-  const c = cfg(s.mode), b = s.today.before;
+  const c = cfg(s), b = s.today.before;
   const [details, setDetails] = useState(false);
   const notes = resultNotes(prev, s);
   // each note over a room makes its sound as it pops up (same timing as the animation in Station)

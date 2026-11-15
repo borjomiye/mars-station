@@ -2,7 +2,7 @@ import { cellsAvailable, cfg, currentEvent, effectiveJobs, isBlackout, planTotal
 import { t } from '../engine/text';
 
 export function helperLine(s: GameState, picking: boolean): string {
-  const c = cfg(s.mode), day = today(s);
+  const c = cfg(s), day = today(s);
   if (s.phase === 'briefing') {
     if (s.sol === 1) return t('helper.welcomeCaptainReadTheMorning');
     if (day.storm) return t('helper.aSolarStormHitsToday');
@@ -42,7 +42,7 @@ export function helperLine(s: GameState, picking: boolean): string {
 }
 
 export function whyText(s: GameState): string[] {
-  const c = cfg(s.mode), S = c.SYSTEMS, w = c.CELLS_BY_WEATHER;
+  const c = cfg(s), S = c.SYSTEMS, w = c.CELLS_BY_WEATHER;
   if (s.phase === 'briefing') return [
     t('helper.eachMorningYouLearnWhat'),
     t('helper.theSkySetsTodayS', { clear: w.clear, hazy: w.hazy, dust: w.dust }),

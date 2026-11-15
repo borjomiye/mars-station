@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import factsFile from '../src/data/facts.json';
 import {
-  MODES, addProblem, applyPlan, cardDef, cards, cfg, cellsAvailable, createMission, crewById, donki, doseComparison, endMission, facts, enterMedbay, eventChoices, go, jobAllowed,
+  MODES, addProblem, applyPlan, cardDef, cards, cfg, cellsAvailable, createMission, siteDef, sites, taskDef, twists, crewById, donki, doseComparison, endMission, facts, enterMedbay, eventChoices, go, jobAllowed,
   planTotal, playSol, proceed, radioCanSend, sendMessage, startPlanning, wordCount,
   type GameState, type Job, type Plan, type SystemId,
 } from '../src/engine';
@@ -15,7 +15,7 @@ const sched = (s: GameState) => s.schedule.map((d) => d.kind[0] + (d.eventId || 
 
 /** A clean lab mission without events, for single-rule checks. */
 function mk(sol: number, edit?: (s: GameState) => void): GameState {
-  const s = createMission('unit test', 'medium');
+  const s = createMission('unit test', 'medium', { siteId: '', twistId: '', taskIds: [] });
   for (const d of s.schedule) { d.kind = 'quiet'; d.eventId = null; d.storm = null; d.weather = 'clear'; d.real = []; }
   s.sol = sol; s.supply = 10; s.phase = 'plan';
   edit?.(s);
@@ -236,10 +236,11 @@ describe('radiation', () => {
 describe('lab, science and radio', () => {
   it('the scientist turns a sample into a card in one sol; a half-powered lab works at half speed; a dark lab does nothing', () => {
     const ok = run(mk(6, (t) => { t.samples = 1; }), plan({ lab: 2 }, { otto: 'lab' }));
-    expect(ok.cards.found).toContain('lab_1');
+    const labCards = (s: GameState) => s.cards.found.filter((id) => cardDef(id).kind === 'lab');
+    expect(labCards(ok)).toHaveLength(1); // which lab card comes first depends on the mission name
     expect(ok.samples).toBeCloseTo(0);
     const half = run(mk(6, (t) => { t.samples = 1; }), plan({ lab: 1 }, { otto: 'lab' }));
-    expect(half.cards.found).not.toContain('lab_1');
+    expect(labCards(half)).toHaveLength(0);
     expect(half.labWork).toBeCloseTo(1);
     const dark = run(mk(6, (t) => { t.samples = 1; }), plan({ lab: 0 }, { otto: 'lab' }));
     expect(dark.labWork).toBeCloseTo(0);
@@ -266,9 +267,51 @@ describe('lab, science and radio', () => {
 });
 
 describe('data and state machine', () => {
-  it('the album has 16 cards with a title and a hint', () => {
-    expect(cards).toHaveLength(16);
-    for (const k of cards) { expect(cardDef(k.id).title.length).toBeGreaterThan(2); expect(k.hint.length).toBeGreaterThan(2); }
+  it('the album has 27 cards, each with a title, a hint, a NASA photo file and a source link', () => {
+    expect(cards).toHaveLength(27);
+    for (const k of cards) {
+      expect(cardDef(k.id).title.length).toBeGreaterThan(2); expect(k.hint.length).toBeGreaterThan(2);
+      expect(existsSync(`src/assets/cards/${k.id}.jpg`), k.id).toBe(true);
+      expect(k.link).toMatch(/^https:\/\/(images\.nasa\.gov|osdr\.nasa\.gov)\//);
+    }
+  });
+});
+
+describe('landing sites, twists and Mission Control tasks', () => {
+  it('the mission name picks the same site, twist and tasks in every mode', () => {
+    const a = createMission('Brave Otter', 'easy');
+    for (const m of MODES) {
+      const b = createMission('Brave Otter', m);
+      expect([b.siteId, b.twistId, b.tasks.map((x) => x.id)]).toEqual([a.siteId, a.twistId, a.tasks.map((x) => x.id)]);
+    }
+  });
+  it('every site and twist is used, and each has a card or a price', () => {
+    const seen = { site: new Set<string>(), twist: new Set<string>() };
+    for (let i = 0; i < 200; i++) { const s = createMission('pick ' + i, 'easy'); seen.site.add(s.siteId); seen.twist.add(s.twistId); }
+    expect(seen.site.size).toBe(sites.length);
+    expect(seen.twist.size).toBe(twists.length);
+    for (const x of [...sites, ...twists]) { expect(x.plus.length).toBeGreaterThan(5); expect(x.minus.length).toBeGreaterThan(5); }
+    for (const x of sites) expect(cardDef(x.card).kind).toBe('milestone');
+  });
+  it('a site changes the numbers of its mission only', () => {
+    const plain = cfg('medium'), gale = cfg({ mode: 'medium', siteId: 'gale' });
+    expect(gale.CELLS_BY_WEATHER.clear).toBe(plain.CELLS_BY_WEATHER.clear + 1);
+    expect(gale.AIR_START).toBe(plain.AIR_START - 1);
+    expect(plain.CELLS_BY_WEATHER.clear).toBe(C.CELLS_BY_WEATHER.clear);
+  });
+  it('the landing site card is found on sol 1', () => {
+    const s = createMission('Brave Otter', 'easy');
+    expect(s.cards.found).toContain(siteDef(s.siteId).card);
+  });
+  it('a finished task pays science; a missed one does not', () => {
+    for (let i = 0; i < 20; i++) {
+      const s = runMission('task ' + i, 'easy');
+      for (const task of s.tasks) expect(['open', 'done', 'failed']).toContain(task.status);
+    }
+    const s = runMission('task 0', 'easy'), done = s.tasks.filter((x) => x.status === 'done');
+    const cardScience = s.cards.sent.reduce((a, id) => a + C.SCIENCE_PER_CARD[cardDef(id).kind], 0);
+    const firstCall = s.cards.found.includes('first_call') && !s.cards.sent.includes('first_call') ? C.SCIENCE_PER_CARD.milestone : 0;
+    expect(s.science).toBe(cardScience + firstCall + done.reduce((a, x) => a + taskDef(x.id).reward, 0));
   });
   it('illegal phase transitions are rejected', () => {
     expect(() => go(createMission('x', 'easy'), 'radio')).toThrow();

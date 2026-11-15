@@ -51,8 +51,9 @@ function Meter({ img, label, value, max, color }: { img: string; label: string; 
   );
 }
 
-export function Hud({ s, onMenu, onData }: { s: GameState; onMenu: () => void; onData: () => void }) {
-  const c = cfg(s.mode), day = today(s), st = stormOn(s);
+export function Hud({ s, onMenu, onData, onTasks }: { s: GameState; onMenu: () => void; onData: () => void; onTasks: () => void }) {
+  const tasksDone = s.tasks.filter((x) => x.status === 'done').length;
+  const c = cfg(s), day = today(s), st = stormOn(s);
   const sky = day.weather === 'dust' ? 'weather-dust' : day.weather === 'hazy' ? 'weather-clearing' : 'weather-clear';
   return (
     <header className="hud" aria-label="Station status">
@@ -74,6 +75,11 @@ export function Hud({ s, onMenu, onData }: { s: GameState; onMenu: () => void; o
       </div>
       <div className="hud-buttons">
         <SoundToggle className="secondary small sound-btn" />
+        {s.tasks.length > 0 && (
+          <button className="secondary small tasks-btn" data-sfx="open" onClick={onTasks} aria-label={`Mission Control tasks: ${tasksDone} of ${s.tasks.length} done`} title="Mission Control tasks">
+            Tasks {tasksDone}/{s.tasks.length}
+          </button>
+        )}
         <button className="secondary small" data-sfx="open" onClick={onData} aria-label="Where the data comes from">i</button>
         <button className="secondary small" onClick={onMenu}>Menu</button>
       </div>
@@ -94,7 +100,7 @@ export function crewState(p: CrewMember): { key: string | null; text: string } {
 
 /** Who this person is and how they are: shown on hover and when picked. */
 export function CrewCard({ s, p }: { s: GameState; p: CrewMember }) {
-  const c = cfg(s.mode), b = badgeOf(c, p.dose), st = crewState(p), energy = energyOf(c, p), job = effectiveJobs(s)[p.id] ?? 'rest';
+  const c = cfg(s), b = badgeOf(c, p.dose), st = crewState(p), energy = energyOf(c, p), job = effectiveJobs(s)[p.id] ?? 'rest';
   const max = c.BADGE_RED_MSV * 1.1;
   return (
     <div className="crew-card">

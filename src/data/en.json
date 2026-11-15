@@ -346,6 +346,15 @@
     "sol.workingWhileIll": "working while ill",
     "sol.worksAgain": "{problem} works again",
     "sol.youLetItGo": "you let it go",
-    "sol.youWaitedItOut": "you waited it out"
+    "sol.youWaitedItOut": "you waited it out",
+    "sol.landedAt": "We landed in {site}, {where}.",
+    "sol.missionControlAsks": "Mission Control asks: {task}.",
+    "sol.taskDone": "Mission Control task done! +{reward} science",
+    "sol.taskMissed": "Mission Control task missed",
+    "sol.taskDoneNote": "Done: {task}. +{reward} science!",
+    "sol.taskMissedNote": "Missed: {task}.",
+    "sol.missionTwistName": "Mission twist: {name}.",
+    "sol.twistGood": "Good: {plus}.",
+    "sol.twistBad": "But: {minus}."
   }
 }

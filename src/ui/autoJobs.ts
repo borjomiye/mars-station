@@ -4,7 +4,7 @@
 import { applyPlan, cfg, type GameState, type Job } from '../engine';
 
 function usefulJob(s: GameState, crewId: string): Job {
-  const c = cfg(s.mode), p = s.crew.find((q) => q.id === crewId)!, cells = s.plan.cells;
+  const c = cfg(s), p = s.crew.find((q) => q.id === crewId)!, cells = s.plan.cells;
   if (s.sol < c.JOB_UNLOCK_SOL || p.medbay > 0 || p.sick || p.cond === 'tired') return 'rest';
   switch (c.SPECIALIST_OF[p.role]) {
     case 'grow': return cells.greenhouse > 0 ? 'grow' : 'rest';
@@ -20,7 +20,7 @@ export function withAutoJobs(s: GameState, touched: string[]): GameState {
   if (s.phase !== 'plan') return s;
   const jobs = { ...s.plan.jobs };
   let changed = false;
-  const c = cfg(s.mode);
+  const c = cfg(s);
   for (const p of s.crew) {
     if (touched.includes(p.id)) continue;
     // only people who are resting or already on their own job: a fixer set for today, or anyone sent outside, is left alone

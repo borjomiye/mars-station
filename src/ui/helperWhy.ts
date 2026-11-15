@@ -5,7 +5,7 @@ import { zeroSols } from './helper';
 
 export function helperWhy(s: GameState): string[] {
   if (s.phase !== 'plan') return [];
-  const c = cfg(s.mode), day = today(s), S = c.SYSTEMS;
+  const c = cfg(s), day = today(s), S = c.SYSTEMS;
   const free = cellsAvailable(s) - planTotal(s.plan), pc = s.plan.cells, jobs = effectiveJobs(s);
   const tired = s.crew.find((p) => p.cond === 'tired' && c.HEAVY_JOBS.includes(jobs[p.id]));
   const ill = s.crew.find((p) => p.sick && p.medbay <= 0 && jobs[p.id] !== 'rest');

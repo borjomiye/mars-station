@@ -12,7 +12,7 @@ const B = botBalance;
 const roll = (s: GameState, tag: string) => mulberry32(hashString(s.seed + ':' + s.sol + ':' + tag));
 
 export function botPlan(s: GameState, style: BotStyle): Plan {
-  const c = cfg(s.mode), day = today(s);
+  const c = cfg(s), day = today(s);
   const cells: Record<SystemId, number> = { life: 0, shield: 0, greenhouse: 0, radio: 0, lab: 0 }, jobs: Record<string, Job> = {};
   let left = cellsAvailable(s);
   const give = (k: SystemId, n: number) => {
@@ -53,7 +53,7 @@ export function botPlan(s: GameState, style: BotStyle): Plan {
 }
 
 export function botChoice(s: GameState, style: BotStyle): [string, string[]] {
-  const c = cfg(s.mode), ev = currentEvent(s), list = eventChoices(s).filter((x) => x.enabled);
+  const c = cfg(s), ev = currentEvent(s), list = eventChoices(s).filter((x) => x.enabled);
   const lastId = (): [string, string[]] => { const l = list.filter((x) => !x.pick); return [l[l.length - 1].id, []]; };
   if (!ev || style === 'lazy') return lastId();
   if (style === 'sloppy' && roll(s, 'choice')() < B.skipChoice) return lastId(); // "I'll deal with it later"
@@ -82,7 +82,7 @@ export function botChoice(s: GameState, style: BotStyle): [string, string[]] {
 export function botMessage(s: GameState, style: BotStyle): RadioMessageId | null {
   if (style === 'lazy') return null;
   if (style === 'sloppy' && roll(s, 'msg')() < B.skipMessage) return null; // forgot the radio
-  const c = cfg(s.mode), o = messageOptions(s), en = (id: RadioMessageId) => !!o.find((m) => m.id === id)?.enabled;
+  const c = cfg(s), o = messageOptions(s), en = (id: RadioMessageId) => !!o.find((m) => m.id === id)?.enabled;
   const unsent = s.cards.found.filter((id) => !s.cards.sent.includes(id)).length;
   if (en('science') && (unsent >= 2 || s.sol >= c.MISSION_SOLS - 2)) return 'science';
   if (en('doctors')) return 'doctors';
