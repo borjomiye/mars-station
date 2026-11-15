@@ -1,5 +1,3 @@
-// Balance check: npm run simulate -- 300
-// Plays N missions per bot and mode and prints how many end with 0/1/2/3 stars.
 import { MODES } from '../src/engine';
 import { balanceReport } from './bots';
 
@@ -13,7 +11,6 @@ for (const [name, r] of Object.entries(rows)) {
   console.log(pad(name, 22) + r.stars.map((x) => pad(x, 6)).join('') + pad(r.reachedShip, 6) + pad(r.avgScience, 9) + pad(r.avgMinAir, 8) + pad(r.avgMinFood, 9) + pad(r.avgMaxDose, 9) + r.avgMedbaySols);
 }
 
-// Guard rails for CI: the game must stay winnable, losable, and the third star must stay hard.
 const fail: string[] = [];
 for (const mode of MODES) {
   const careful = rows['careful / ' + mode], sloppy = rows['sloppy / ' + mode], lazy = rows['lazy / ' + mode];
@@ -23,7 +20,6 @@ for (const mode of MODES) {
   if (sloppy.stars[3] > n * 0.15) fail.push(`${mode}: mistakes are not punished (sloppy bot got 3 stars ${sloppy.stars[3]}/${n})`);
   if (lazy.reachedShip > 0) fail.push(`${mode}: doing nothing must not survive (${lazy.reachedShip}/${n})`);
 }
-// Each mode must be harder than the one before it: fewer three-star missions, at least as many sloppy failures.
 for (let i = 1; i < MODES.length; i++) {
   const easier = MODES[i - 1], harder = MODES[i];
   const c3 = (m: string) => rows['careful / ' + m].stars[3], s0 = (m: string) => rows['sloppy / ' + m].stars[0];

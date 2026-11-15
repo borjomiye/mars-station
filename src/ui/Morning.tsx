@@ -1,6 +1,3 @@
-// Morning briefing (design "variant A"): Mars sky and ground, the robot tells the news in a speech bubble
-// (typed line by line), and a board shows space weather, the station and what is new today.
-// Tap the bubble to finish a line. Reduced motion shows all lines at once.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { cfg, fmt, getMorning, knownForecast, siteDef, taskDef, taskText, twistDef, type GameState, type Weather } from '../engine';
 import { icon, robotArt, scene } from './art';
@@ -12,7 +9,6 @@ import stationArt from '../assets/briefing/station.svg';
 import newArt from '../assets/briefing/new-today.svg';
 
 const CHARS_PER_TICK = 2, TICK_MS = 33, PAUSE_MS = 650;
-/** Today plus at most this many forecast sols fit on the board. */
 const MAX_FORECAST = 3;
 const reducedMotion = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
@@ -21,7 +17,6 @@ const SKY: Record<Weather, { label: string; art: string }> = {
   hazy: { label: 'Hazy', art: 'weather-clearing' },
   dust: { label: 'Dust storm', art: 'weather-dust' },
 };
-/** getMorning() gives the weather as a plain string. */
 const skyOf = (w: string): Weather => (w === 'dust' || w === 'hazy' ? w : 'clear');
 
 export function MorningScreen({ s, onNext }: { s: GameState; onNext: () => void }) {
@@ -35,7 +30,7 @@ export function MorningScreen({ s, onNext }: { s: GameState; onNext: () => void 
   const curLen = talk[shown - 1]?.text.length ?? 0, typing = typed < curLen;
 
   useEffect(() => {
-    if (typing && typed > 0 && talk[shown - 1]?.text[typed] !== ' ') sfx.type(); // the robot "speaks" in blips
+    if (typing && typed > 0 && talk[shown - 1]?.text[typed] !== ' ') sfx.type();
     if (typing) { const id = setTimeout(() => setTyped((t) => t + CHARS_PER_TICK), TICK_MS); return () => clearTimeout(id); }
     if (shown < talk.length) { const id = setTimeout(() => { setShown((n) => n + 1); setTyped(0); }, PAUSE_MS); return () => clearTimeout(id); }
     return undefined;
@@ -178,7 +173,6 @@ function Status({ s }: { s: GameState }) {
   );
 }
 
-/** Mission Control: the landing site and twist on sol 1, and the tasks with their status. */
 function MissionControl({ s }: { s: GameState }) {
   const site = s.siteId ? siteDef(s.siteId) : null, tw = s.twistId ? twistDef(s.twistId) : null;
   return (
@@ -225,7 +219,6 @@ function NewToday({ unlocked, words }: { unlocked: string[]; words: string[] }) 
   );
 }
 
-/** The same report, kept for re-reading while planning. */
 export function MorningRecap({ s }: { s: GameState }) {
   const beats = useMemo(() => beatsOf(s), [s]);
   return <div className="talk-bubble static">{beats.map((b, i) => <BeatLine key={i} b={b} />)}</div>;

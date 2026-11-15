@@ -1,5 +1,4 @@
 {
-  "_note": "Requests from Mission Control. The mission name picks TASKS_PER_MISSION of them. `check` is one of the checks in src/engine/tasks.ts; `by` is the last sol to do it; `reward` is extra science. Owner: P5.",
   "tasks": [
     {
       "id": "first_harvest",

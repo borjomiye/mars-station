@@ -24,7 +24,7 @@ npm run simulate
 - Curiosity RAD: background radiation dose on the Mars surface.
 - More in `DATA.md` (to be written by the data owner).
 
-Team plan: [PLAN.md](PLAN.md). Rules for contributors and AI assistants: [CLAUDE.md](CLAUDE.md).
+Team plan: [PLAN.md](PLAN.md).
 
 ## Status after the greybox merge
 

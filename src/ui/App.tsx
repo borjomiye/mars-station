@@ -1,4 +1,3 @@
-// The game, one 1280×720 screen at a time: title → morning → base (plan) → event → results → evening → … → report.
 import { useEffect, useState } from 'react';
 import { buttonSound } from './sound';
 import {
@@ -24,26 +23,23 @@ export default function App() {
   const [win, setWin] = useState<Window>(null);
   const [name, setName] = useState(() => randomMissionName());
   const [mode, setMode] = useState<Mode>('easy');
-  const [manual, setManual] = useState<{ sol: number; ids: string[] }>({ sol: 0, ids: [] }); // jobs the captain set by hand this sol
+  const [manual, setManual] = useState<{ sol: number; ids: string[] }>({ sol: 0, ids: [] });
 
-  const [beforeSol, setBeforeSol] = useState<GameState | null>(null); // state just before the sol was played, to show what changed
-  const [fresh, setFresh] = useState<string[]>([]); // cards found but not looked at yet (banner)
-  const [look, setLook] = useState<string | null>(null); // card open right now
+  const [beforeSol, setBeforeSol] = useState<GameState | null>(null);
+  const [fresh, setFresh] = useState<string[]>([]);
+  const [look, setLook] = useState<string | null>(null);
 
-  // every button clicks by itself (see sound.ts); buttons with their own sound say data-sfx="…"
   useEffect(() => {
     const on = (e: MouseEvent) => buttonSound(e.target);
     document.addEventListener('click', on, true);
     return () => document.removeEventListener('click', on, true);
   }, []);
 
-  /** Every engine step goes through here: save the mission, keep found cards in the album. */
   const set = (next: GameState) => {
     if (next.phase === 'results' && s && s.phase !== 'results') setBeforeSol(s);
-    // cards found by this step pop up as a banner (a new mission starts with an empty list)
     const sameMission = s && s.seed === next.seed && s.phase !== 'report' && next.sol >= s.sol;
     const before = sameMission ? s.cards.found : [];
-    const found = next.cards.found.filter((id) => !before.includes(id) && !album.includes(id)); // only cards new to the album pop up
+    const found = next.cards.found.filter((id) => !before.includes(id) && !album.includes(id));
     if (found.length) setFresh((f) => [...f.filter((id) => !found.includes(id)), ...found]);
     if (!sameMission) setFresh(found);
     setPicking(null);

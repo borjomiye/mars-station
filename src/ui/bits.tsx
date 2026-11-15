@@ -1,4 +1,3 @@
-// Small pieces shared by the screens: top bar, crew card, dose badge, robot mood, morning report lines.
 import { useEffect, useRef, useState } from 'react';
 import {
   badgeOf, cellsAvailable, cfg, effectiveJobs, energyOf, fmt, fmt2, getMorning, isBlackout, plural, stormOn, today,
@@ -7,7 +6,6 @@ import {
 import { crewArt, icon } from './art';
 import { setMuted, useMuted } from './sound';
 
-/** Sound on/off: a pixel speaker, with waves when on and a cross when off. The choice is remembered. */
 export function SoundToggle({ className }: { className: string }) {
   const muted = useMuted();
   return (
@@ -23,9 +21,6 @@ export function SoundToggle({ className }: { className: string }) {
   );
 }
 
-// ---------- top bar ----------
-
-/** 'up' / 'down' right after the value changed, so the number can bounce or shake (motion.css). */
 function useChange(value: number): '' | 'up' | 'down' {
   const prev = useRef(value);
   const [dir, setDir] = useState<'' | 'up' | 'down'>('');
@@ -87,8 +82,6 @@ export function Hud({ s, onMenu, onData, onTasks }: { s: GameState; onMenu: () =
   );
 }
 
-// ---------- crew ----------
-
 export const badgeIcon = (b: Badge) => icon(`badge-${b}`);
 
 export function crewState(p: CrewMember): { key: string | null; text: string } {
@@ -98,7 +91,6 @@ export function crewState(p: CrewMember): { key: string | null; text: string } {
   return { key: null, text: 'Fine' };
 }
 
-/** Who this person is and how they are: shown on hover and when picked. */
 export function CrewCard({ s, p }: { s: GameState; p: CrewMember }) {
   const c = cfg(s), b = badgeOf(c, p.dose), st = crewState(p), energy = energyOf(c, p), job = effectiveJobs(s)[p.id] ?? 'rest';
   const max = c.BADGE_RED_MSV * 1.1;
@@ -125,8 +117,6 @@ export function CrewCard({ s, p }: { s: GameState; p: CrewMember }) {
   );
 }
 
-// ---------- robot ----------
-
 export function helperMood(s: GameState): 'alert' | 'worried' | 'happy' | 'thinking' | 'calm' {
   if (stormOn(s) || s.counters.airZero || s.counters.foodZero || s.problems.some((p) => p.severity > 1)) return 'alert';
   if (s.problems.length || s.crew.some((p) => p.medbay > 0 || p.sick || p.cond === 'tired')) return 'worried';
@@ -135,18 +125,14 @@ export function helperMood(s: GameState): 'alert' | 'worried' | 'happy' | 'think
   return s.phase === 'radio' ? 'happy' : 'calm';
 }
 
-// ---------- morning report ----------
-
 export type Beat = { kind: 'say' | 'alert' | 'earth' | 'good' | 'word' | 'real' | 'today' | 'forecast'; text: string; real?: RealEvent; small?: string };
 
-/** What the robot says out loud. From sol 2 on the engine's `lines` are the station status
- *  (harvest, repairs, medbay); the morning board shows those as cards, so it passes `withStatus = false`. */
 export function talkOf(s: GameState, withStatus = true): Beat[] {
   const m = getMorning(s), out: Beat[] = [];
   for (const a of m.answers) out.push({ kind: 'earth', text: `Earth: ${a}` });
   if (withStatus || s.sol === 1) for (const l of m.lines) out.push({ kind: 'say', text: l });
   for (const l of m.notes) out.push({ kind: 'alert', text: l });
-  for (const l of m.news ?? []) out.push({ kind: 'good', text: l }); // Mission Control task results
+  for (const l of m.news ?? []) out.push({ kind: 'good', text: l });
   if (m.storm) out.push({ kind: 'alert', text: `Solar storm today: dose x${m.storm.mult} unless the shield is fully powered.` });
   if (m.blackout) out.push({ kind: 'alert', text: 'Radio blackout today: the Sun is between Mars and Earth.' });
   return out;

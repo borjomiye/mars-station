@@ -1,4 +1,3 @@
-// Full-screen moments of a sol: title, event, evening call, mission report, plus album and data windows.
 import {
   badgeOf, cards, cellsAvailable, cfg, crewById, currentEvent, donki, doseComparison, doseFor, effectiveCells, endMission, eventChoices, fmt, fmt2, getPeriod,
   MODES, messageOptions, missionSetup, normSeed, planTotal, plural, problemNeed, siteDef, stormOn, taskDef, taskText, twistDef, workPower,
@@ -11,8 +10,6 @@ import { choiceIcon } from './choiceIcons';
 import { MissionPatch } from './Patch';
 import { sfx, useScreenSounds } from './sound';
 
-// ---------- title ----------
-
 const MODE_NAME: Record<Mode, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
 
 type TitleProps = {
@@ -21,7 +18,6 @@ type TitleProps = {
 };
 export function TitleScreen(p: TitleProps) {
   const [help, setHelp] = useState(false);
-  // the mission name picks the landing site and the twist: show them as the player types
   const setup = missionSetup(normSeed(p.name || 'Brave Otter')), site = siteDef(setup.siteId), tw = twistDef(setup.twistId);
   return (
     <div className="screen title">
@@ -99,7 +95,6 @@ export function TitleScreen(p: TitleProps) {
               <button className="secondary small" data-sfx="close" onClick={() => setHelp(false)} aria-label="Close" autoFocus>X</button>
             </div>
             <ol className="overlay-body htp-steps">
-              {/* steps 1-8 written by the team in PR #8 (test/polish), checked against balance.json; step 9 covers the mission name */}
               <li><span className="step-num">1</span><div><b>Goal.</b> Keep all five crew alive until sol 15. If air or food stays at zero for too long (3 sols on Easy, 2 on Medium, 1 on Hard), the mission ends.</div></li>
               <li><span className="step-num">2</span><div><b>Morning.</b> Read the sky. Clear, hazy or dusty weather decides how many power cells the solar panels give today. A solar storm raises radiation.</div></li>
               <li><span className="step-num">3</span><div><b>Plan.</b> Share the power cells between life support, shield, greenhouse, radio and lab. Not enough cells for a system means it works badly or not at all. Then give each person a job.</div></li>
@@ -117,8 +112,6 @@ export function TitleScreen(p: TitleProps) {
   );
 }
 
-// ---------- event ----------
-
 type EventProps = {
   s: GameState; picking: { id: string; ids: string[] } | null;
   onChoose: (id: string) => void; onTogglePick: (crewId: string) => void; onPickConfirm: () => void; onPickCancel: () => void;
@@ -126,7 +119,6 @@ type EventProps = {
 };
 export function EventScreen({ s, picking, onChoose, onTogglePick, onPickConfirm, onPickCancel, onChange, onBack, onPlay }: EventProps) {
   const c = cfg(s), ev = currentEvent(s), list = eventChoices(s), ch = s.today.choice, st = stormOn(s);
-  // the event announces itself: a storm rumbles, trouble beeps, a chance sparkles
   useScreenSounds(() => (ev ? [[150, ev.id === 'solar_storm' ? sfx.storm : ev.kind === 'trouble' ? sfx.alarm : sfx.chance]] : []), [ev?.id, s.sol]);
   if (!ev) return null;
   const sick = ev.id === 'sick_crew' && s.today.sickId ? crewById(s, s.today.sickId) : null;
@@ -134,7 +126,6 @@ export function EventScreen({ s, picking, onChoose, onTogglePick, onPickConfirm,
   const pickDef = picking ? list.find((x) => x.id === picking.id) : null;
   const chosen = ch ? list.find((x) => x.id === ch.id) : null, freeNow = cellsAvailable(s) - planTotal(s.plan);
   const shield = effectiveCells(s).shield;
-  // repair picks: how much work the problem still needs and how much the picked people bring
   const problem = pickDef?.pick?.task === 'repair' && ev.problem ? s.problems.find((p) => p.type === ev.problem) : undefined;
   const repairNeed = problem ? Math.max(0, problemNeed(c, problem) - problem.done) : null;
   const picked = picking ? picking.ids.reduce((a, id) => a + workPower(c, crewById(s, id), 'fix'), 0) : 0;
@@ -218,8 +209,6 @@ export function EventScreen({ s, picking, onChoose, onTogglePick, onPickConfirm,
   );
 }
 
-// ---------- evening call ----------
-
 export function RadioScreen({ s, onSend }: { s: GameState; onSend: (id: RadioMessageId | null) => void }) {
   useScreenSounds(() => [[120, sfx.staticHiss]], [s.sol]);
   return (
@@ -246,14 +235,11 @@ export function RadioScreen({ s, onSend }: { s: GameState; onSend: (id: RadioMes
   );
 }
 
-// ---------- mission report ----------
-
 const STAR_NAMES = ['Crew home safe', 'Science done', 'Nobody in the medbay, all badges green'];
 const RealLine = ({ e }: { e: RealEvent }) => <li><b>{e.date} · {e.label}</b> <span className="muted">{e.note}.</span> <a href={e.link} target="_blank" rel="noreferrer">DONKI</a></li>;
 
 export function ReportScreen({ s, album, onAgain, onNew }: { s: GameState; album: string[]; onAgain: () => void; onNew: () => void }) {
   const r = endMission(s);
-  // stars drop in one by one (timed with their animation), then the ship lands; an early return starts with a gentle "aww"
   useScreenSounds(() => [
     ...(r.won ? [] : [[150, sfx.lose] as [number, () => void]]),
     ...r.stars.flatMap((on, i): [number, () => void][] => (on ? [[(r.won ? 300 : 900) + i * 350 + 120, () => sfx.star(i)]] : [])),
@@ -264,7 +250,6 @@ export function ReportScreen({ s, album, onAgain, onNew }: { s: GameState; album
   const c = cfg(s), iss = doseComparison.iss.perDayMSv, issDay = (iss.min + iss.max) / 2;
   const avgDose = r.doses.reduce((a, d) => a + d.dose, 0) / Math.max(1, r.doses.length);
   const issDays = Math.max(1, Math.round(avgDose / issDay));
-  // one thing to try next time: the first star that was missed, or a harder mode
   const missed = r.stars.findIndex((on) => !on);
   const tryNext = missed >= 0 ? (missed === 0 ? r.mattered : r.hints[missed]) : s.mode !== 'hard' ? 'All three stars! Try a harder mode next.' : 'All three stars on Hard. A true Mars captain!';
   return (
@@ -324,13 +309,9 @@ export function ReportScreen({ s, album, onAgain, onNew }: { s: GameState; album
   );
 }
 
-// ---------- windows ----------
-
 const KIND_NAME: Record<CardKind, string> = { chance: 'Mars find', lab: 'Lab find', milestone: 'Milestone' };
 const KIND_ICON: Record<CardKind, string> = { chance: 'rock-sample', lab: 'science', milestone: 'star' };
 
-/** Found cards show their real NASA photo; a click opens the photo with its fact and sources. */
-/** One card: the real NASA photo, the fact and its sources. Used by the album and by the "new card" pop-up. */
 export function CardDetail({ card, onBack, backLabel }: { card: CardDef; onBack: () => void; backLabel: string }) {
   const photoLink = `https://images.nasa.gov/details/${card.photo.nasaId}`;
   const sameSource = card.link === photoLink;
@@ -355,7 +336,6 @@ export function CardDetail({ card, onBack, backLabel }: { card: CardDef; onBack:
   );
 }
 
-/** A small banner when a card is found, with a button to look at it right away. */
 export function CardToast({ id, more, onLook, onClose }: { id: string; more: number; onLook: () => void; onClose: () => void }) {
   const card = cards.find((k) => k.id === id);
   if (!card) return null;
@@ -372,7 +352,6 @@ export function CardToast({ id, more, onLook, onClose }: { id: string; more: num
   );
 }
 
-/** Mission Control requests for this mission and how they stand. */
 export function TasksView({ s }: { s: GameState }) {
   const mark = { open: '…', done: '✓', failed: '✕' } as const;
   return (

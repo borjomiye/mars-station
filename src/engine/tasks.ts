@@ -1,5 +1,3 @@
-// Mission setup picked by the mission name (landing site, twist, Mission Control tasks) and the task checks.
-// Everything here depends only on the seed, so the same name gives the same Mars in every mode.
 import type { GameState, TaskDef, TaskState } from './types';
 import { baseBalance, cfg, sites, taskDef, taskDefs, twists } from './content';
 import { badgeOf } from './rules';
@@ -14,12 +12,10 @@ export function missionSetup(seed: string): { siteId: string; twistId: string; t
   return { siteId: pick('site', sites).id, twistId: pick('twist', twists).id, taskIds: pool.slice(0, n).map((d) => d.id) };
 }
 
-/** "Collect {need} rock samples outside by sol {by}" with the numbers filled in. */
 export function taskText(d: TaskDef): string {
   return d.text.replace('{need}', String(d.need)).replace('{by}', String(d.by));
 }
 
-/** Tasks that must hold until a sol ("keep ... until") vs tasks that must be reached by a sol. */
 const HOLD = new Set(['airAbove', 'noMedbay', 'greenBadges']);
 
 function met(s: GameState, d: TaskDef): boolean {
@@ -35,10 +31,6 @@ function met(s: GameState, d: TaskDef): boolean {
   }
 }
 
-/**
- * Updates the tasks and pays the rewards. `solDone` = the sol `s.sol` has been played (results or
- * evening); otherwise it is the morning of `s.sol`. Mutates. Returns the tasks that changed.
- */
 export function updateTasks(s: GameState, solDone: boolean): { def: TaskDef; task: TaskState }[] {
   const changed: { def: TaskDef; task: TaskState }[] = [];
   const lastPlayed = solDone ? s.sol : s.sol - 1;
@@ -49,7 +41,7 @@ export function updateTasks(s: GameState, solDone: boolean): { def: TaskDef; tas
       if (!ok) task.status = 'failed';
       else if (lastPlayed >= d.by) task.status = 'done';
     } else if (ok && lastPlayed <= d.by) task.status = 'done';
-    else if (!ok && lastPlayed >= d.by && !solDone) task.status = 'failed'; // the evening of the last sol still counts
+    else if (!ok && lastPlayed >= d.by && !solDone) task.status = 'failed';
     if (task.status !== 'open') {
       task.sol = s.sol;
       if (task.status === 'done') s.science += d.reward;

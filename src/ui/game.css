@@ -1,6 +1,3 @@
-/* Layout of the 1280×720 game screens. Colours only from theme.css (owner: P6). Sizes are frame pixels. */
-
-/* ---------- frame ---------- */
 html, body, #root { height: 100%; }
 body { overflow: hidden; }
 .frame-wrap { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); }
@@ -9,7 +6,6 @@ body { overflow: hidden; }
 .screen { position: absolute; inset: 0; overflow: hidden; }
 .screen-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 65%; }
 .in-sol { display: flex; flex-direction: column; }
-/* event and evening screens sit under the top bar, never behind it */
 .in-sol > .screen { top: 64px; }
 
 .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
@@ -25,7 +21,6 @@ a { color: var(--life); }
 .bar { height: 10px; background: var(--outline); border-radius: 2px; overflow: hidden; }
 .bar > div { height: 100%; transition: width 0.4s; }
 
-/* ---------- windows ---------- */
 .overlay { position: absolute; inset: 0; z-index: 50; display: grid; place-items: center; background: rgba(8, 10, 16, 0.6); }
 .overlay-box { width: 640px; max-height: 620px; display: flex; flex-direction: column; background: var(--panel); border-radius: var(--radius); box-shadow: 0 0 0 3px var(--outline), 8px 8px 0 3px var(--outline); }
 .overlay-box.wide { width: 1000px; }
@@ -36,11 +31,8 @@ a { color: var(--life); }
 .why-line { padding: 8px 12px; border-radius: var(--radius); background: var(--bubble); color: var(--bubble-text); font-size: 24px; }
 .why-more { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
 
-/* ---------- top bar ---------- */
 .hud { flex: none; height: 64px; display: flex; align-items: center; gap: 14px; padding: 0 14px; background: var(--panel); border-bottom: 3px solid var(--outline); z-index: 5; }
-/* every top-bar icon fits the same 30×30 box, tall ones (science tube, air bottle) included */
 .hud img { width: 30px; height: 30px; object-fit: contain; flex: none; }
-/* a tight square border right on the weather tile */
 .sky-frame { display: block; flex: none; width: 34px; height: 34px; border: 3px solid var(--outline); }
 .hud .sky-frame img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .hud-sol, .hud-sky { display: flex; align-items: center; gap: 8px; line-height: 1.15; }
@@ -57,7 +49,6 @@ a { color: var(--life); }
 .hud-buttons { display: flex; gap: 8px; }
 .hud-buttons button { margin-bottom: 0; }
 
-/* ---------- crew card ---------- */
 .portrait { position: relative; display: inline-block; width: 48px; height: 48px; flex: none; overflow: hidden; border-radius: var(--radius); background: var(--outline); box-shadow: 0 0 0 2px var(--outline); }
 .portrait img { width: 100%; height: 100%; object-fit: cover; object-position: center 35%; }
 .portrait img.role-medic { object-position: center 55%; }
@@ -76,7 +67,6 @@ a { color: var(--life); }
 .badge.amber { color: var(--energy); } .badge.amber .bar > div { background: var(--energy); }
 .badge.red { color: var(--danger); } .badge.red .bar > div { background: var(--danger); }
 
-/* ---------- station board ---------- */
 .station { position: relative; flex: none; overflow: hidden; }
 .station > * { position: absolute; }
 .station.storm::after { content: ''; position: absolute; inset: 0; background: var(--storm-tint); pointer-events: none; }
@@ -98,24 +88,20 @@ a { color: var(--life); }
 .st-chip img { width: 16px; height: auto; }
 .st-cells { display: flex; gap: 1px; }
 .st-cells img { width: 12px; }
-/* round rooms get no box shade; the dome shape is shaded instead */
 .st-room.round.dark, .st-room.round.dim, .st-room.round.locked { background: none; animation: none; }
 .st-dome-dark {
   height: auto; pointer-events: none; opacity: 0; transition: opacity 0.35s, filter 0.12s;
   filter: brightness(0.38) saturate(0.6);
-  /* only the glass: the teal base under the rim stays lit */
   clip-path: polygon(0% 0%, 100% 0%, 100% 77%, 90% 82.5%, 80% 86.5%, 70% 89%, 50% 90.5%, 30% 89%, 20% 86.5%, 10% 82.5%, 0% 77%);
 }
 .st-dome-dark.dark, .st-dome-dark.locked, .st-dome-dark.dim { opacity: 1; }
 .st-dome-dark.dim { filter: brightness(0.75) saturate(0.85); }
 .station.blink-off .st-dome-dark.dim { filter: brightness(0.38) saturate(0.6); }
-/* people in a dark room are in the dark too */
 .st-body { transition: filter 0.35s; }
 .st-crew.in-dark .st-body { filter: brightness(0.42) saturate(0.7); }
 .st-crew.in-dim .st-body { filter: brightness(0.85) saturate(0.9); transition: filter 0.12s; }
 .station.blink-off .st-crew.in-dim .st-body { filter: brightness(0.42) saturate(0.7); }
 .st-crew.in-dark.selected .st-body { filter: brightness(0.75) drop-shadow(0 0 3px var(--energy)); }
-/* crop growth sits under the greenhouse chip */
 .st-crop { position: absolute; left: 50%; top: 6px; transform: translateX(-50%); z-index: 2; display: flex; align-items: center; gap: 6px; padding: 1px 8px; white-space: nowrap; background: var(--chip-bg); border: 2px solid var(--chip-border); border-radius: 6px; font: 400 19px var(--font-body); color: var(--text); }
 .st-crop-bar { display: block; width: 70px; height: 8px; background: var(--outline); }
 .st-crop-bar i { display: block; height: 100%; background: var(--food); }
@@ -126,7 +112,7 @@ a { color: var(--life); }
   animation: st-blink 1.2s steps(2) infinite;
 }
 .st-problem img { width: 18px; }
-.st-crop ~ .st-problem { top: 40px; } /* greenhouse: the harvest bar stays on top, the trouble goes under it */
+.st-crop ~ .st-problem { top: 40px; }
 .st-repair { display: block; width: 44px; height: 6px; background: var(--panel-2); }
 .st-repair i { display: block; height: 100%; background: var(--energy); }
 @keyframes st-blink { 50% { border-color: var(--energy); } }
@@ -147,7 +133,6 @@ a { color: var(--life); }
   display: none; position: absolute; bottom: 0; width: 300px; z-index: 20; padding: 10px 12px;
   background: var(--panel); border-radius: var(--radius); box-shadow: 0 0 0 3px var(--outline), 5px 5px 0 3px var(--outline);
 }
-/* the card opens beside the person, so it never runs off the top of the screen */
 .tip-right .st-card { left: calc(100% + 12px); }
 .tip-left .st-card { right: calc(100% + 12px); }
 .st-crew:hover .st-card, .st-crew-hit:focus-visible + .st-card, .st-crew.selected .st-card { display: block; }
@@ -156,9 +141,7 @@ a { color: var(--life); }
 .st-jobs button img { width: 16px; margin-right: 3px; }
 .st-card-note { margin: 6px 0 0; font-size: 18px; }
 
-/* robot in the sky */
 .sky-helper { left: 14px; top: 12px; display: flex; align-items: flex-start; gap: 10px; max-width: 820px; z-index: 6; }
-/* the robot sits in its own little screen frame */
 .robot-frame { flex: none; width: 64px; height: 64px; display: grid; place-items: center; background: var(--robot-frame); border-radius: var(--radius); box-shadow: 0 0 0 3px var(--outline), 4px 4px 0 3px var(--outline); }
 .robot-frame img { width: 52px; height: auto; }
 .sky-bubble { margin: 0; padding: 6px 12px; border-radius: var(--radius); background: var(--bubble); color: var(--bubble-text); font-size: 23px; line-height: 1.1; box-shadow: 0 0 0 3px var(--outline); max-width: 420px; }
@@ -166,12 +149,10 @@ a { color: var(--life); }
 .icon-btn { margin: 0; padding: 0; width: 38px; height: 38px; min-height: 38px; display: grid; place-items: center; font: 400 16px var(--font-pixel); box-shadow: 0 0 0 2px var(--outline), 0 3px 0 2px var(--outline); }
 .icon-btn img { width: 24px; height: auto; margin: 0; }
 
-/* results over the station */
 .results-card { right: 14px; top: 12px; width: 470px; max-height: 300px; overflow: hidden; z-index: 6; padding: 10px 14px; background: var(--chip-bg); border-radius: var(--radius); box-shadow: 0 0 0 3px var(--outline); }
 .results-card h2 { margin: 0 0 8px; font-size: 14px; }
 .results-card ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; font-size: 20px; }
 
-/* ---------- controls under the station ---------- */
 .controls { flex: 1; display: flex; gap: 10px; align-items: stretch; padding: 12px 14px; background: var(--panel); border-top: 3px solid var(--outline); }
 .free { width: 90px; display: grid; place-content: center; justify-items: center; gap: 4px; background: var(--panel-2); border-radius: var(--radius); box-shadow: 0 0 0 2px var(--outline); font-size: 18px; line-height: 1; }
 .free b { font-size: 56px; line-height: 0.9; }
@@ -204,7 +185,6 @@ a { color: var(--life); }
 .controls.results p { margin: 0; }
 .results-sum { margin: 0; font-size: 30px; }
 
-/* ---------- morning briefing ("variant A") ---------- */
 .brief { background: var(--brief-sky); }
 .brief.storm { background: var(--brief-sky-storm); }
 .brief.dust { background: var(--brief-sky-dust); }
@@ -218,7 +198,6 @@ a { color: var(--life); }
   padding: 0 28px; background: var(--brief-ground); border-top: 6px solid var(--brief-ground-top);
 }
 
-/* robot and speech bubble */
 .brief-helper { position: absolute; left: 24px; top: 70px; bottom: 72px; width: 336px; display: flex; flex-direction: column; justify-content: flex-end; gap: 22px; }
 .brief-bubble {
   position: relative; min-height: 0; padding: 10px 14px 12px 52px; cursor: pointer;
@@ -234,9 +213,7 @@ a { color: var(--life); }
 @keyframes brief-float { 50% { transform: translateY(-6px); } }
 @keyframes brief-talk { 50% { rotate: -1.5deg; } }
 
-/* the board */
 .brief-board {
-  /* stands on the ground and grows upward; never higher than just under the title */
   position: absolute; left: 384px; right: 26px; bottom: 98px; max-height: 556px; overflow: hidden;
   display: flex; flex-direction: column; gap: 10px; padding: 14px 18px;
   background: var(--brief-board); color: var(--brief-text); border: 4px solid var(--outline); box-shadow: 8px 8px 0 var(--outline);
@@ -251,7 +228,6 @@ a { color: var(--life); }
 .brief-label h2 { margin: 0; font-size: 14px; line-height: 1.6; color: var(--brief-text); }
 .brief-label span { color: var(--brief-muted); font-size: 20px; }
 
-/* space weather: day cards + real data */
 .brief-wx { display: flex; gap: 14px; align-items: flex-start; min-width: 0; }
 .brief-days-wrap { flex: 1 1 auto; min-width: 0; }
 .brief-days { display: grid; gap: 10px; padding-top: 12px !important; }
@@ -283,7 +259,6 @@ a { color: var(--life); }
 .brief-note, .brief-more { font-size: 18px; color: var(--brief-muted); }
 .brief-real-b a { color: var(--bubble-earth); font-size: 19px; }
 
-/* station status */
 .brief-status { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .brief-status li { min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; background: var(--brief-paper); border: 3px solid var(--outline); font-size: 21px; }
 .brief-st-top { display: flex; align-items: center; gap: 6px; }
@@ -298,7 +273,6 @@ a { color: var(--life); }
 .brief-steps i { height: 10px; background: var(--brief-board); border: 2px solid var(--brief-rule); }
 .brief-steps i.on { background: var(--brief-green); border-color: var(--outline); }
 
-/* new today */
 .brief-new { display: grid; gap: 6px; }
 .brief-unlock { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 6px 14px; background: var(--brief-mint); border: 3px solid var(--outline); box-shadow: 4px 4px 0 var(--outline); }
 .brief-unlock strong { font: 18px var(--font-pixel); color: var(--outline); }
@@ -312,7 +286,6 @@ a { color: var(--life); }
 }
 .talk-bubble.dense .beat { font-size: 25px; }
 .talk-bubble.static { cursor: auto; box-shadow: 0 0 0 3px var(--outline); }
-/* the robot speaks in a terminal font */
 .talk-bubble, .sky-bubble { font-family: var(--font-robot); }
 .beat { margin: 0; font-size: 31px; line-height: 1.12; }
 .beat.alert { color: var(--bubble-alert); }
@@ -331,9 +304,6 @@ a { color: var(--life); }
 .caret { display: inline-block; width: 0.55em; height: 1em; margin-left: 2px; vertical-align: -0.12em; background: currentColor; animation: brief-caret 0.6s steps(2) infinite; }
 @keyframes brief-caret { 50% { opacity: 0; } }
 
-/* ---------- title ---------- */
-/* Variant A: one solid panel on the left, the whole scene on the right, robot points at the panel.
-   No blur, no soft shadows: only hard pixel offsets. */
 .title-robot { position: absolute; right: 30px; bottom: 6px; height: 400px; width: auto; transform: scaleX(-1); image-rendering: pixelated; }
 .title-panel {
   position: absolute; left: 40px; top: 50%; transform: translateY(-50%); width: 520px; box-sizing: border-box;
@@ -385,7 +355,6 @@ button.corner-btn:active:not(:disabled) { transform: translateY(2px); box-shadow
 .htp-steps li { display: flex; align-items: flex-start; gap: 12px; font-size: 21px; line-height: 1.25; }
 .htp-steps li b { color: var(--accent); font-weight: 400; }
 
-/* ---------- event ---------- */
 .event .screen-bg { object-position: center 60%; }
 .event-head { position: absolute; left: 24px; right: 24px; top: 20px; display: flex; gap: 14px; align-items: flex-start; padding: 12px 18px; background: var(--chip-bg); border-radius: var(--radius); box-shadow: 0 0 0 3px var(--outline); }
 .event-head.trouble { box-shadow: 0 0 0 3px var(--danger); }
@@ -410,7 +379,6 @@ button.pick b { font-size: 22px; }
 .pick-badge { display: flex; align-items: center; gap: 4px; }
 .pick-badge img { width: 18px; margin: 0; }
 
-/* ---------- evening call ---------- */
 .radio .screen-bg { filter: brightness(0.55); }
 .radio-panel { position: absolute; left: 60px; right: 60px; top: 40px; bottom: 40px; display: flex; flex-direction: column; gap: 16px; padding: 22px 26px; background: var(--chip-bg); border-radius: var(--radius); box-shadow: 0 0 0 3px var(--outline); }
 .radio-head { display: flex; gap: 16px; align-items: center; }
@@ -420,7 +388,6 @@ button.pick b { font-size: 22px; }
 .radio .choice-row { flex: 1; align-content: start; }
 .radio .row.end { margin-top: auto; }
 
-/* ---------- report ---------- */
 .report { background: var(--panel); display: flex; flex-direction: column; }
 .report-banner { flex: none; width: 100%; height: 190px; object-fit: cover; object-position: center 62%; }
 .report-head { flex: none; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 24px 0; }
@@ -442,7 +409,6 @@ button.pick b { font-size: 22px; }
 .small-text { font-size: 18px; }
 .report-buttons { flex: none; display: flex; justify-content: flex-end; gap: 12px; padding: 0 24px 14px; }
 
-/* ---------- album and data ---------- */
 .album-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .album-card { display: grid; justify-items: center; gap: 4px; padding: 10px; text-align: center; background: var(--panel-2); border-radius: var(--radius); box-shadow: 0 0 0 2px var(--outline); font-size: 20px; }
 .album-card img { width: 56px; height: auto; }
@@ -463,7 +429,6 @@ button.album-card:hover, button.album-card:focus-visible { outline: 3px solid va
   .st-body, .st-status, .st-room.dim, .st-problem, .brief-robot, .launch, .pop, .caret { animation: none; }
 }
 
-/* pick step: hover a person for their card; repair power shows who is best at the job */
 button.pick { position: relative; }
 .pick-tip {
   display: none; position: absolute; left: 50%; bottom: calc(100% + 12px); transform: translateX(-50%); width: 300px; z-index: 30;
@@ -476,7 +441,6 @@ button.pick:hover .pick-tip, button.pick:focus-visible .pick-tip { display: bloc
 .pick-power.best { background: var(--accent-dark); color: var(--text); }
 .pick-power.weak { color: var(--energy); }
 
-/* ---------- results over the rooms ---------- */
 .st-notes { position: absolute; transform: translate(-50%, 0); z-index: 14; margin: 0; padding: 0; list-style: none; display: grid; justify-items: center; gap: 4px; pointer-events: none; }
 .st-note {
   display: flex; align-items: center; gap: 6px; padding: 3px 10px; white-space: nowrap; border-radius: var(--radius);
@@ -503,14 +467,11 @@ button.pick:hover .pick-tip, button.pick:focus-visible .pick-tip { display: bloc
 .details-list { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 20px; }
 @media (prefers-reduced-motion: reduce) { .st-note { animation: none; } }
 
-/* ---------- choice card pictures ---------- */
 .choice .plus, .choice .minus { display: flex; align-items: center; gap: 8px; }
 .choice .plus img, .choice .minus img { flex: none; width: 26px; height: 26px; object-fit: contain; image-rendering: pixelated; }
 
-/* ---------- album: unfound cards show a silhouette of their kind ---------- */
 .album-card .album-silhouette { width: 64px; height: 64px; object-fit: contain; image-rendering: pixelated; filter: brightness(0) opacity(0.45); }
 
-/* ---------- mission patch ---------- */
 .patch { position: relative; display: inline-block; flex: none; }
 .patch img, .patch-cloth { position: absolute; }
 .patch-border { inset: 0; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
@@ -523,7 +484,6 @@ button.pick:hover .pick-tip, button.pick:focus-visible .pick-tip { display: bloc
 .name-field .patch { margin-left: -8px; }
 .report-head > div { flex: 1 1 auto; }
 
-/* ---------- simpler report ---------- */
 .report-banner { height: 150px; }
 .report-head h1 { font-size: 20px; }
 .report-stars img { width: 72px; }
@@ -540,12 +500,10 @@ button.pick:hover .pick-tip, button.pick:focus-visible .pick-tip { display: bloc
 .crew-badge { display: flex; align-items: center; gap: 4px; }
 .crew-badge img { width: 22px; height: 22px; object-fit: contain; }
 
-/* ---------- sound on/off ---------- */
 .sound-btn { display: grid; place-items: center; }
 .sound-btn svg, .corner-btn svg { display: block; }
 .sound-btn[aria-pressed="false"], .corner-btn[aria-pressed="false"] { opacity: 0.65; }
 
-/* ---------- mission twists, tasks and the "new card" banner ---------- */
 .title-mission { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; font-size: 20px; line-height: 1.1; color: var(--muted); }
 .title-mission b { color: var(--energy); }
 .tasks-btn { white-space: nowrap; }
@@ -569,23 +527,17 @@ button.pick:hover .pick-tip, button.pick:focus-visible .pick-tip { display: bloc
 .card-toast-text span { font: 400 11px var(--font-pixel); color: var(--energy); text-transform: uppercase; }
 .card-toast-text b { font-size: 26px; }
 
-/* ---------- layout fixes (review of 2026-11-15) ---------- */
-/* morning bubble: never squeezed smaller than its text (the robot shrinks instead); long talk scrolls inside */
 .brief-bubble { flex: 0 0 auto; overflow: hidden; }
 .brief-lines { padding-right: 6px; scrollbar-gutter: stable; }
-/* "Opens today": readable body font instead of a scaled-down pixel font, and air before the new words */
 .brief-new { gap: 14px; }
 .brief-unlock { align-items: center; }
 .brief-unlock span:first-child { font-size: 22px; }
 .brief-unlock strong { font: 32px/1 var(--font-body); color: var(--outline); }
-/* top bar: a long mission name stays inside its box */
 .hud-sol > div { min-width: 0; max-width: 170px; }
 .hud-sol b { white-space: nowrap; }
 .hud-sol span { display: block !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* result notes above the low modules: anchored by their bottom edge */
 .st-notes.above { transform: translate(-50%, -100%); }
 
-/* Mission Control: easy to spot everywhere */
 .tasks-btn { background: var(--energy) !important; color: var(--outline) !important; box-shadow: 0 0 0 3px var(--outline), 0 5px 0 3px var(--mars-dark) !important; }
 .brief-mc { display: grid; gap: 8px; min-width: 0; }
 .brief-mc-setup { font-size: 21px; line-height: 1.1; }
@@ -611,22 +563,16 @@ button.pick:hover .pick-tip, button.pick:focus-visible .pick-tip { display: bloc
 .brief-tasks li b { font-size: 17px; }
 .brief-mc-setup span { color: var(--brief-muted); font-size: 18px; }
 .st-notes.outside { transform: translate(0, -100%); justify-items: start; }
-/* Tasks button: its shadow stays inside the top bar like the other buttons */
 .tasks-btn { box-shadow: 0 0 0 3px var(--outline), 0 5px 0 3px var(--outline) !important; }
-/* top bar meters: the label never wraps, even at 10/10 */
 .hud-meter { width: 158px; }
 .hud-meter-label { gap: 6px; }
 .hud-meter-label span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .hud-meter-label b { white-space: nowrap; flex: none; }
-/* the dice sits in the middle of the name field (the global button margin pushed it up) */
 .name-field .dice { margin: 0; align-self: center; }
-/* top-bar flags ("storm ×2", "8 sols") stay on one line inside the bar */
 .hud-flags .flag { white-space: nowrap; line-height: 1.1; font-size: 18px; padding: 3px 7px; }
 .hud-flags .flag img { width: 18px; height: 18px; }
-/* crowded top bar (storm + tasks): nothing wraps */
 .hud { gap: 10px; }
 .hud-sky > div, .hud-sky span { white-space: nowrap; }
 .hud-meter { width: 150px; }
-/* a crowded room (everyone in the shelter): names on hover or when picked */
 .st-crew.crowded .st-name { opacity: 0; transition: opacity 0.15s; }
 .st-crew.crowded:hover .st-name, .st-crew.crowded.selected .st-name, .st-crew.crowded:focus-within .st-name { opacity: 1; z-index: 3; }

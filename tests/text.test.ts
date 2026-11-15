@@ -1,4 +1,3 @@
-// The sentences of the game live in src/data/en.json ("text"). Code may only use keys that exist there.
 import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { t, textKeys } from '../src/engine/text';
@@ -6,7 +5,6 @@ import { t, textKeys } from '../src/engine/text';
 const files = ['src/engine', 'src/ui'].flatMap((d) => readdirSync(d).filter((f) => /\.tsx?$/.test(f)).map((f) => `${d}/${f}`));
 const source = files.map((f) => readFileSync(f, 'utf8')).join('\n');
 const used = new Set([...source.matchAll(/\bt\(\s*'([a-zA-Z0-9.]+)'/g)].map((m) => m[1]));
-// keys built from a prefix, e.g. t(`report.greenhouse${...}Power${...}`)
 const dynamic = ['report.greenhouseNoPowerOneSol', 'report.greenhouseNoPowerSols', 'report.greenhouseLowPowerOneSol', 'report.greenhouseLowPowerSols'];
 
 describe('texts in en.json', () => {

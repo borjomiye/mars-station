@@ -1,5 +1,4 @@
 {
-  "_note": "Trouble and chance events. Choices and their prices are built in src/engine/rules.ts (eventChoices). Owner: P5.",
   "troubles": {
     "loose_pipe": {
       "title": "Loose water pipe",

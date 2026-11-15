@@ -1,5 +1,3 @@
-// The base: the whole sol is planned on one screen. Station in the middle, cells for each room
-// along the bottom, the robot's hint in the sky. After playing, the same screen shows the results.
 import { useState, type ReactNode } from 'react';
 import {
   SYSTEMS, cellsAvailable, cfg, currentEvent, doseFor, fmt, fmt2, isBlackout, isUnlocked, planTotal, plural, previewSol, radioBlocked, radioCanSend, radioOffReason, stormOn, taskDef, taskText,
@@ -17,7 +15,6 @@ import { sfx, useScreenSounds } from './sound';
 
 export const STAGE_H = 456;
 
-/** A tiny pixel "report sheet" for the morning report button (drawn, so it matches the ? next to it). */
 const ReportGlyph = () => (
   <svg width="22" height="24" viewBox="0 0 11 12" aria-hidden="true" style={{ shapeRendering: 'crispEdges' }}>
     <path d="M1 0h7l2 2v10H1z" fill="currentColor" />
@@ -39,7 +36,6 @@ function Helper({ s, onWhy, extra }: { s: GameState; onWhy: () => void; extra?: 
   );
 }
 
-/** "Why?" window: first the reason for what the robot says now, then how a sol works. */
 function WhyWindow({ s, onClose }: { s: GameState; onClose: () => void }) {
   const line = helperLine(s, false);
   return (
@@ -88,7 +84,6 @@ export function PlanBase({ s, onCells, onJob, onDone }: PlanProps) {
                   <div className="sys-row">
                     <button className="small secondary" data-sfx="none" aria-label={`Less power for ${d.name}`} disabled={n <= 0} onClick={() => { sfx.cell(n - 1, false); onCells(k, -1); }}>−</button>
                     <span className="sys-cells" aria-label={`${n} of ${d.want} cells`}>
-                      {/* the key changes when a cell fills, so the new cell plays its "snap in" animation (motion.css) */}
                       {Array.from({ length: d.max }, (_, i) => <img key={`${i}-${i < n}`} src={icon(i < n ? 'cell' : 'cell-empty')} className={`${i >= d.want ? 'bonus' : ''}${i < n ? ' on' : ''}`} alt="" />)}
                     </span>
                     <button className="small" data-sfx="none" aria-label={`More power for ${d.name}`} disabled={black || n >= d.max || free <= 0} onClick={() => { sfx.cell(n + 1, true); onCells(k, 1); }}>+</button>
@@ -115,7 +110,6 @@ export function PlanBase({ s, onCells, onJob, onDone }: PlanProps) {
   );
 }
 
-/** Open Mission Control tasks, pinned in the sky while the captain plans the sol. */
 function TaskPin({ s }: { s: GameState }) {
   const open = s.tasks.filter((x) => x.status === 'open');
   if (!open.length) return null;
@@ -131,7 +125,6 @@ export function ResultsBase({ s, prev, onNext }: { s: GameState; prev: GameState
   const c = cfg(s), b = s.today.before;
   const [details, setDetails] = useState(false);
   const notes = resultNotes(prev, s);
-  // each note over a room makes its sound as it pops up (same timing as the animation in Station)
   useScreenSounds(() => Object.values(notes).flatMap((list, k) => (list ?? []).map((n, i): [number, () => void] => [
     (k * 3 + i) * 180 + 140,
     n.text.startsWith('Harvest') ? sfx.harvest : n.icon === 'card-back' ? sfx.card : n.tone === 'good' ? sfx.good : n.tone === 'bad' ? sfx.bad : sfx.soft,

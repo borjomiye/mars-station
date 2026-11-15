@@ -1,5 +1,4 @@
 {
-  "_note": "Mission twists: one per mission, picked by the mission name. Like real mission planning, every gain costs something (a rocket can carry only so much). Same `patch` format as sites.json. Owner: P5.",
   "twists": [
     {
       "id": "extra_food",

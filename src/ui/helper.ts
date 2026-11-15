@@ -76,5 +76,4 @@ export function whyText(s: GameState): string[] {
   return [];
 }
 
-/** "1 sol" on Hard, "2 sols in a row" otherwise. */
 export const zeroSols = (n: number): string => (n > 1 ? `${plural(n, 'sol')} in a row` : plural(n, 'sol'));

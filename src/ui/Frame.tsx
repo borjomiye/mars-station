@@ -1,4 +1,3 @@
-// The game is a fixed 1280×720 screen, scaled to fit the window (no page scrolling). Owner: P6.
 import { useEffect, useState, type ReactNode } from 'react';
 
 export const FRAME_W = 1280, FRAME_H = 720;
@@ -20,7 +19,6 @@ export function Frame({ children }: { children: ReactNode }) {
   );
 }
 
-/** A window inside the frame for long content (album, data sources, "why?"). Closes on Esc or the button. */
 export function Overlay({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   useEffect(() => {
     const on = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };

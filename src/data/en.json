@@ -1,5 +1,4 @@
 {
-  "_note": "All texts of the game. `text` holds the sentences of the engine and the helper: \"{name}\" marks a value filled in by the code.",
   "crew": [
     {
       "id": "leo",
