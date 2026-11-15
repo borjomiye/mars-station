@@ -11,7 +11,9 @@ import { helperLine, whyText } from './helper';
 import { helperWhy } from './helperWhy';
 import { MorningRecap } from './Morning';
 import { Station } from './Station';
+import { resultNotes } from './results';
 import { Overlay } from './Frame';
+import { sfx, useScreenSounds } from './sound';
 
 export const STAGE_H = 456;
 
@@ -30,7 +32,7 @@ function Helper({ s, onWhy, extra }: { s: GameState; onWhy: () => void; extra?: 
       <span className="robot-frame"><img src={robotArt(`face-${helperMood(s)}`)} alt="Station helper robot" /></span>
       {line && <p className="sky-bubble">{line}</p>}
       <div className="sky-buttons">
-        <button className="secondary icon-btn" onClick={onWhy} aria-label="Why?" title="Why?">?</button>
+        <button className="secondary icon-btn" data-sfx="open" onClick={onWhy} aria-label="Why?" title="Why?">?</button>
         {extra}
       </div>
     </div>
@@ -69,7 +71,7 @@ export function PlanBase({ s, onCells, onJob, onDone }: PlanProps) {
   return (
     <>
       <Station s={s} height={STAGE_H} selected={selected} onSelect={setSelected} onJob={onJob}
-        overlay={<Helper s={s} onWhy={() => setWhy(true)} extra={<button className="secondary icon-btn" onClick={() => setMorning(true)} aria-label="Morning report" title="Morning report"><ReportGlyph /></button>} />} />
+        overlay={<Helper s={s} onWhy={() => setWhy(true)} extra={<button className="secondary icon-btn" data-sfx="open" onClick={() => setMorning(true)} aria-label="Morning report" title="Morning report"><ReportGlyph /></button>} />} />
       <div className="controls">
         <div className={`free${free > 0 ? ' alert' : ''}`}>
           <span>Free cells</span>
@@ -84,11 +86,11 @@ export function PlanBase({ s, onCells, onJob, onDone }: PlanProps) {
               {open ? (
                 <>
                   <div className="sys-row">
-                    <button className="small secondary" aria-label={`Less power for ${d.name}`} disabled={n <= 0} onClick={() => onCells(k, -1)}>−</button>
+                    <button className="small secondary" data-sfx="none" aria-label={`Less power for ${d.name}`} disabled={n <= 0} onClick={() => { sfx.cell(n - 1, false); onCells(k, -1); }}>−</button>
                     <span className="sys-cells" aria-label={`${n} of ${d.want} cells`}>
                       {Array.from({ length: d.max }, (_, i) => <img key={i} src={icon(i < n ? 'cell' : 'cell-empty')} className={i >= d.want ? 'bonus' : ''} alt="" />)}
                     </span>
-                    <button className="small" aria-label={`More power for ${d.name}`} disabled={black || n >= d.max || free <= 0} onClick={() => onCells(k, 1)}>+</button>
+                    <button className="small" data-sfx="none" aria-label={`More power for ${d.name}`} disabled={black || n >= d.max || free <= 0} onClick={() => { sfx.cell(n + 1, true); onCells(k, 1); }}>+</button>
                   </div>
                   <p className="sys-effect">{effect(k, n, short)}</p>
                 </>
@@ -112,24 +114,48 @@ export function PlanBase({ s, onCells, onJob, onDone }: PlanProps) {
   );
 }
 
-export function ResultsBase({ s, onNext }: { s: GameState; onNext: () => void }) {
+export function ResultsBase({ s, prev, onNext }: { s: GameState; prev: GameState | null; onNext: () => void }) {
   const c = cfg(s.mode), b = s.today.before;
+  const [details, setDetails] = useState(false);
+  const notes = resultNotes(prev, s);
+  // each note over a room makes its sound as it pops up (same timing as the animation in Station)
+  useScreenSounds(() => Object.values(notes).flatMap((list, k) => (list ?? []).map((n, i): [number, () => void] => [
+    (k * 3 + i) * 180 + 140,
+    n.text.startsWith('Harvest') ? sfx.harvest : n.icon === 'card-back' ? sfx.card : n.tone === 'good' ? sfx.good : n.tone === 'bad' ? sfx.bad : sfx.soft,
+  ])), [s.sol]);
   const label = s.over ? 'Mission Control calls ▶' : radioCanSend(s) ? 'Evening call ▶' : s.sol >= c.MISSION_SOLS ? 'The ship lands ▶' : `Sleep → sol ${s.sol + 1} ▶`;
   const note = s.over ? `A tank stayed empty for ${plural(c.ZERO_SOLS_TO_LOSE, 'sol')}.` : radioCanSend(s) ? '' : radioOffReason(s);
-  const delta = (a: number, z: number) => <b className={z > a ? 'good' : z < a ? 'alert' : ''}>{fmt(a)}→{fmt(z)}</b>;
+  const tiles: { img: string; label: string; a: number; z: number }[] = b ? [
+    { img: icon('air'), label: 'Air', a: b.air, z: s.air },
+    { img: icon('food'), label: 'Food', a: b.food, z: s.food },
+    { img: icon('science'), label: 'Science', a: b.science, z: s.science },
+  ] : [];
   return (
     <>
-      <Station s={s} height={STAGE_H} overlay={
-        <div className="results-card">
-          <h2>Sol {s.sol} results</h2>
-          <ul>{s.lastResults.map((r, i) => <li key={i}><b>{r.t}</b> <span className="muted">← {r.why}</span></li>)}</ul>
-        </div>
+      <Station s={s} height={STAGE_H} notes={notes} overlay={
+        <div className="results-title"><h2>Sol {s.sol} is over</h2><span>What changed is shown over each room.</span></div>
       } />
       <div className="controls results">
-        {b && <p className="results-sum">Air {delta(b.air, s.air)} · Food {delta(b.food, s.food)} · Crop {delta(b.crop, s.crop)} · Science {delta(b.science, s.science)}</p>}
-        {note && <p className="alert">{note}</p>}
-        <button className="big" onClick={onNext}>{label}</button>
+        <div className="result-tiles">
+          {tiles.map((t) => (
+            <div key={t.label} className={`result-tile${t.z > t.a ? ' up' : t.z < t.a ? ' down' : ''}`}>
+              <img src={t.img} alt="" />
+              <span>{t.label}</span>
+              <b>{fmt(t.a)} → {fmt(t.z)}</b>
+            </div>
+          ))}
+        </div>
+        <div className="results-side">
+          {note && <p className="alert">{note}</p>}
+          <button className="secondary small" data-sfx="open" onClick={() => setDetails(true)}>All details</button>
+          <button className="big" onClick={onNext}>{label}</button>
+        </div>
       </div>
+      {details && (
+        <Overlay title={`Sol ${s.sol}: everything that happened`} onClose={() => setDetails(false)}>
+          <ul className="details-list">{s.lastResults.map((r, i) => <li key={i}><b>{r.t}</b> <span className="muted">← {r.why}</span></li>)}</ul>
+        </Overlay>
+      )}
     </>
   );
 }

@@ -3,10 +3,9 @@
 // Tap the bubble to finish a line. Reduced motion shows all lines at once.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { cfg, fmt, getMorning, knownForecast, type GameState, type Weather } from '../engine';
-import { icon, robotArt } from './art';
+import { icon, robotArt, scene } from './art';
 import { BeatLine, beatsOf, talkOf, type Beat } from './bits';
-import skyArt from '../assets/briefing/stars.svg';
-import groundArt from '../assets/briefing/ground.svg';
+import { sfx, useScreenSounds } from './sound';
 import tailArt from '../assets/briefing/tail.svg';
 import okArt from '../assets/briefing/ok.svg';
 import stationArt from '../assets/briefing/station.svg';
@@ -36,6 +35,7 @@ export function MorningScreen({ s, onNext }: { s: GameState; onNext: () => void 
   const curLen = talk[shown - 1]?.text.length ?? 0, typing = typed < curLen;
 
   useEffect(() => {
+    if (typing && typed > 0 && talk[shown - 1]?.text[typed] !== ' ') sfx.type(); // the robot "speaks" in blips
     if (typing) { const id = setTimeout(() => setTyped((t) => t + CHARS_PER_TICK), TICK_MS); return () => clearTimeout(id); }
     if (shown < talk.length) { const id = setTimeout(() => { setShown((n) => n + 1); setTyped(0); }, PAUSE_MS); return () => clearTimeout(id); }
     return undefined;
@@ -43,12 +43,12 @@ export function MorningScreen({ s, onNext }: { s: GameState; onNext: () => void 
   const tap = () => { if (typing) setTyped(Infinity); else if (shown < talk.length) { setShown((n) => n + 1); setTyped(0); } };
 
   const alarm = talk.some((b) => b.kind === 'alert');
+  useScreenSounds(() => (m.storm || alarm ? [[450, sfx.alarm]] : []), [s.sol]);
   const tint = m.storm ? ' storm' : skyOf(m.weather) === 'dust' ? ' dust' : '';
 
   return (
     <div className={`screen brief${tint}`}>
-      <img className="brief-sky" src={skyArt} alt="" />
-      <img className="brief-ground" src={groundArt} alt="" />
+      <div className="brief-bg" style={{ backgroundImage: `url(${scene(m.storm ? 'scene-radiation-storm' : skyOf(m.weather) === 'dust' ? 'bg-dust-storm' : 'bg-clear')})` }} />
       <h1 className="brief-title">Good morning, Captain · Sol {s.sol}</h1>
 
       <div className="brief-helper">
@@ -160,7 +160,7 @@ function Status({ s }: { s: GameState }) {
         <h2 id="brief-status">STATION STATUS</h2>
       </div>
       <ul className="brief-status">
-        <Card art={icon('food')} name="HARVEST" badge={harvested ? 'IN' : 'GROWING'} tone={harvested ? 'ok' : 'plain'}>
+        <Card art={icon('crop')} name="HARVEST" badge={harvested ? 'IN' : 'GROWING'} tone={harvested ? 'ok' : 'plain'}>
           <p>{harvested ? 'Came in. New crop: ' : 'Crop: '}step {fmt(s.crop)} of {need}</p>
           <span className="brief-steps" aria-hidden="true" style={{ gridTemplateColumns: `repeat(${need}, minmax(0, 1fr))` }}>
             {Array.from({ length: need }, (_, k) => <i key={k} className={k < grown ? 'on' : undefined} />)}
