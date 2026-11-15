@@ -1,6 +1,25 @@
 {
-  "stub": true,
-  "_note": "PLACEHOLDER. Owner: P4. Fill from NASA RadLab (ISS daily dose) with a link, for the ISS vs Mars comparison.",
-  "issDailyDoseMSv": null,
-  "source": "https://www.nasa.gov/ (RadLab link TBD)"
+  "stub": false,
+  "_note": "Owner: P4. ISS vs Mars radiation dose for the 'Where the data comes from' screen. Every number is copied from the linked NASA page (checked 2026-11-15). perDayMSv for the ISS = the six-month numbers divided by 182.5 days.",
+  "iss": {
+    "sixMonthsSolarMaxMSv": 80,
+    "sixMonthsSolarMinMSv": 160,
+    "perDayMSv": { "min": 0.44, "max": 0.88 },
+    "source": "NASA educator guide \"Space Faring: The Radiation Challenge\" (EP-2008-08-116-MSFC), page 8: crews on the space station receive an average of 80 mSv for a six-month stay at solar maximum and 160 mSv at solar minimum",
+    "link": "https://www.nasa.gov/wp-content/uploads/2017/04/radiationchallenge.pdf"
+  },
+  "mars": {
+    "perDayMSv": 0.67,
+    "period": "August 2012 to June 2013",
+    "source": "NASA news release, 9 Dec 2013: Curiosity's RAD measured an average of 0.67 millisieverts per day on the surface at Gale Crater (Hassler et al., Science 343, 2014, doi:10.1126/science.1244797)",
+    "link": "https://www.nasa.gov/news-release/nasa-rover-results-include-first-age-measurement-on-mars-and-help-for-human-exploration/"
+  },
+  "radlab": {
+    "_note": "Raw measurements from NASA RadLab (OSDR), yearly mean of absorbed_dose_rate, converted from uGy/hour to mGy/day. Absorbed dose (mGy), NOT dose equivalent (mSv): per mGy the radiation on Mars is heavier and does more harm, so these numbers must not be compared with the mSv above. Not shown to players; kept for the team.",
+    "unit": "mGy/day (absorbed dose)",
+    "issDosTel1": { "2016": 0.625, "2018": 0.74, "2022": 0.779 },
+    "marsMslRadSurface": { "2016": 0.183, "2018": 0.213, "2022": 0.183 },
+    "query": "https://visualization.osdr.nasa.gov/radlab/api/?spacecraft=ISS&instrument_id=DosTel1&timestamp%3E=2018-01-01&timestamp%3C2019-01-01&absorbed_dose_rate&format=csv",
+    "link": "https://visualization.osdr.nasa.gov/radlab/gui/data-api"
+  }
 }

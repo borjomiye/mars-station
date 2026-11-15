@@ -1,6 +1,6 @@
 // Full-screen moments of a sol: title, event, evening call, mission report, plus album and data windows.
 import {
-  badgeOf, cards, cellsAvailable, cfg, crewById, currentEvent, donki, doseFor, effectiveCells, endMission, eventChoices, fmt, fmt2, getPeriod,
+  badgeOf, cards, cellsAvailable, cfg, crewById, currentEvent, donki, doseComparison, doseFor, effectiveCells, endMission, eventChoices, fmt, fmt2, getPeriod,
   MODES, messageOptions, planTotal, plural, problemNeed, stormOn, workPower,
   type CardKind, type GameState, type Mode, type RadioMessageId, type RealEvent,
 } from '../engine';
@@ -286,12 +286,13 @@ export function AlbumView({ album }: { album: string[] }) {
 }
 
 export function DataView({ periodId }: { periodId?: string }) {
-  const period = periodId ? getPeriod(periodId) : undefined, c = cfg('medium');
+  const period = periodId ? getPeriod(periodId) : undefined, c = cfg('medium'), dose = doseComparison;
   return (
     <div className="data-view">
       {donki.stub && <p className="warning">Placeholder space weather: replace with real DONKI data before the demo.</p>}
       <p>Solar flares, plasma clouds and solar particle storms come from NASA DONKI. Each one really happened on the date shown. Most were seen from near Earth: the game pretends they reached our station.</p>
-      <p>The normal dose of {c.DOSE_INDOOR_PER_SOL} mSv per sol follows the Curiosity rover's RAD instrument (Hassler et al., Science 2014). In a storm the game multiplies it by {c.STORM_MULT_BY_DAY.join(' and ')}.</p>
+      <p>The normal dose of {c.DOSE_INDOOR_PER_SOL} mSv per sol comes from the Curiosity rover: its RAD instrument measured an average of {dose.mars.perDayMSv} mSv per day on Mars from {dose.mars.period} (<a href={dose.mars.link} target="_blank" rel="noreferrer">NASA</a>). In a storm the game multiplies it by {c.STORM_MULT_BY_DAY.join(' and ')}.</p>
+      <p>Is that a lot? Astronauts on the Space Station get about {dose.iss.sixMonthsSolarMaxMSv} to {dose.iss.sixMonthsSolarMinMSv} mSv in six months, that is {dose.iss.perDayMSv.min} to {dose.iss.perDayMSv.max} mSv a day (<a href={dose.iss.link} target="_blank" rel="noreferrer">NASA</a>). So a day on Mars is about like a day on the Space Station. On the way to Mars and in solar storms it is higher.</p>
       <p className="muted">Game values, not NASA limits: the badge turns amber at {c.BADGE_AMBER_MSV} mSv and red at {c.BADGE_RED_MSV} mSv. Crops, repairs and the 15-sol mission are sped up.</p>
       <p className="muted">The station, the crew and the robot are drawn for the game. The photos on album cards are real NASA images, each with its credit. Lab and health cards come from studies in NASA's Open Science Data Repository (OSDR); every card links to its source.</p>
       <p className="muted">{donki.source}</p>

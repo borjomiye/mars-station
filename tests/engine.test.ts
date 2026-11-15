@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import factsFile from '../src/data/facts.json';
 import {
-  MODES, addProblem, applyPlan, cardDef, cards, cfg, cellsAvailable, createMission, crewById, donki, endMission, facts, enterMedbay, eventChoices, go, jobAllowed,
+  MODES, addProblem, applyPlan, cardDef, cards, cfg, cellsAvailable, createMission, crewById, donki, doseComparison, endMission, facts, enterMedbay, eventChoices, go, jobAllowed,
   planTotal, playSol, proceed, radioCanSend, sendMessage, startPlanning, wordCount,
   type GameState, type Job, type Plan, type SystemId,
 } from '../src/engine';
@@ -58,6 +58,15 @@ describe('real NASA data', () => {
       expect(f.link).toBe(`https://osdr.nasa.gov/bio/repo/data/studies/${f.osd}`);
       expect(f.text.length).toBeGreaterThan(20);
     }
+  });
+  it('ISS vs Mars dose is filled from NASA pages and the game uses the measured Mars dose', () => {
+    expect(doseComparison.stub).toBe(false);
+    expect(doseComparison.iss.link).toMatch(/^https:\/\/www\.nasa\.gov\//);
+    expect(doseComparison.mars.link).toMatch(/^https:\/\/www\.nasa\.gov\//);
+    for (const m of MODES) expect(cfg(m).DOSE_INDOOR_PER_SOL).toBe(doseComparison.mars.perDayMSv);
+    const days = 182.5, iss = doseComparison.iss;
+    expect(iss.perDayMSv.min).toBeCloseTo(iss.sixMonthsSolarMaxMSv / days, 2);
+    expect(iss.perDayMSv.max).toBeCloseTo(iss.sixMonthsSolarMinMSv / days, 2);
   });
   it('every album card has a NASA photo file, a fact and a source link', () => {
     for (const k of cards) {
