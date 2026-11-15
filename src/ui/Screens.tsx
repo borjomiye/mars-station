@@ -1,13 +1,15 @@
 // Full-screen moments of a sol: title, event, evening call, mission report, plus album and data windows.
 import {
   badgeOf, cards, cellsAvailable, cfg, crewById, currentEvent, donki, doseFor, effectiveCells, endMission, eventChoices, fmt, fmt2, getPeriod,
-  messageOptions, planTotal, plural, problemNeed, stormOn, workPower,
+  MODES, messageOptions, planTotal, plural, problemNeed, stormOn, workPower,
   type GameState, type Mode, type RadioMessageId, type RealEvent,
 } from '../engine';
 import { crewArt, eventScene, icon, patchArt, robotArt, scene } from './art';
 import { CrewCard, badgeIcon } from './bits';
 
 // ---------- title ----------
+
+const MODE_NAME: Record<Mode, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
 
 type TitleProps = {
   name: string; setName: (v: string) => void; onRandom: () => void; mode: Mode; setMode: (m: Mode) => void;
@@ -29,9 +31,8 @@ export function TitleScreen(p: TitleProps) {
             <button className="secondary small" onClick={p.onRandom}>Random</button>
           </span>
         </label>
-        <div className="row" role="group" aria-label="Mode">
-          <button className={p.mode === 'cadet' ? '' : 'secondary'} aria-pressed={p.mode === 'cadet'} onClick={() => p.setMode('cadet')}>Cadet · 7–9</button>
-          <button className={p.mode === 'commander' ? '' : 'secondary'} aria-pressed={p.mode === 'commander'} onClick={() => p.setMode('commander')}>Commander · 10–12</button>
+        <div className="row" role="group" aria-label="Difficulty">
+          {MODES.map((m) => <button key={m} className={p.mode === m ? '' : 'secondary'} aria-pressed={p.mode === m} onClick={() => p.setMode(m)}>{MODE_NAME[m]}</button>)}
         </div>
         <div className="row">
           <button className="big" onClick={p.onLaunch}>Launch mission ▶</button>
@@ -250,7 +251,7 @@ export function AlbumView({ album }: { album: string[] }) {
 }
 
 export function DataView({ periodId }: { periodId?: string }) {
-  const period = periodId ? getPeriod(periodId) : undefined, c = cfg('commander');
+  const period = periodId ? getPeriod(periodId) : undefined, c = cfg('medium');
   return (
     <div className="data-view">
       {donki.stub && <p className="warning">Placeholder space weather: replace with real DONKI data before the demo.</p>}

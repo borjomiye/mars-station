@@ -80,7 +80,7 @@
     "helper.extraCellsGoBackTo": "Extra cells! Go back to the plan to share them.",
     "helper.freeCell": "free cell",
     "helper.heavySolsInARow": "{heavySolsToTired} heavy sols in a row (fix, outside) make a person tired: half effect until they rest. Heavy work while tired means the medbay.",
-    "helper.ifAirWaterOrFood": "If air & water or food stays at 0 for {zeroSolsToLose} sols in a row, Mission Control calls the crew home early. Nobody dies.",
+    "helper.ifAirWaterOrFood": "If air & water or food stays at 0 for {zeroSols}, Mission Control calls the crew home early. Nobody dies.",
     "helper.isIllAndMustRest": "{name} is ill and must rest, or it gets worse.",
     "helper.isTiredHeavyWorkWill": "{name} is tired. Heavy work will hurt. Give them a rest.",
     "helper.lifeSupportIsShortAir": "Life support is short. Air and water will drop tonight.",

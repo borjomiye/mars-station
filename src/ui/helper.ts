@@ -65,7 +65,7 @@ export function whyText(s: GameState): string[] {
   ];
   if (s.phase === 'results') return [
     t('helper.everyLineNamesAChange'),
-    t('helper.ifAirWaterOrFood', { zeroSolsToLose: c.ZERO_SOLS_TO_LOSE }),
+    t('helper.ifAirWaterOrFood', { zeroSols: zeroSols(c.ZERO_SOLS_TO_LOSE) }),
   ];
   if (s.phase === 'radio') return [
     t('helper.oneMessagePerSolAnd'),
@@ -75,3 +75,6 @@ export function whyText(s: GameState): string[] {
   ];
   return [];
 }
+
+/** "1 sol" on Hard, "2 sols in a row" otherwise. */
+export const zeroSols = (n: number): string => (n > 1 ? `${plural(n, 'sol')} in a row` : plural(n, 'sol'));

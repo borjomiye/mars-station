@@ -1,6 +1,6 @@
 import { t } from './text';
 import type { ChosenChoice, CrewMember, EffectiveJob, Forecast, GameState, MessageOption, Mode, Morning, Phase, Plan, RadioMessageId, RealEvent, ResultLine, SolRecord, Storm } from './types';
-import { SYSTEMS } from './types';
+import { MODES, SYSTEMS } from './types';
 import { cardDef, cards, cfg, crewDefs, words } from './content';
 import { buildSchedule, normSeed, prettyName } from './schedule';
 import {
@@ -121,7 +121,7 @@ function nextSol(s: GameState): GameState {
 }
 
 export function createMission(name: string, mode: Mode): GameState {
-  const m: Mode = mode === 'commander' ? 'commander' : 'cadet', seed = normSeed(name), c = cfg(m), sched = buildSchedule(seed);
+  const m: Mode = MODES.includes(mode) ? mode : 'medium', seed = normSeed(name), c = cfg(m), sched = buildSchedule(seed);
   const s: GameState = {
     version: SAVE_VERSION, name: prettyName(name), seed, mode: m, periodId: sched.periodId, sol: 0, phase: 'briefing',
     air: c.AIR_START, food: c.FOOD_START, crop: 0, samples: 0, labWork: 0, science: 0,

@@ -1,6 +1,7 @@
 // "Why?" for the robot's current hint while planning. Mirrors the order of checks in helperLine (helper.ts),
 // so the answer always explains the line the robot is saying right now.
 import { cellsAvailable, cfg, effectiveJobs, planTotal, today, type GameState } from '../engine';
+import { zeroSols } from './helper';
 
 export function helperWhy(s: GameState): string[] {
   if (s.phase !== 'plan') return [];
@@ -19,7 +20,7 @@ export function helperWhy(s: GameState): string[] {
   ];
   if (pc.life < S.life.want) return [
     `Life support wants ${S.life.want} cells. Each missing cell costs ${c.AIR_LOSS_PER_MISSING_CELL} air & water tonight.`,
-    `If a tank stays empty for ${c.ZERO_SOLS_TO_LOSE} sols, Mission Control calls the crew home early.`,
+    `If a tank stays empty for ${zeroSols(c.ZERO_SOLS_TO_LOSE)}, Mission Control calls the crew home early.`,
   ];
   if (day.storm && pc.shield < S.shield.want) return [
     'A real solar storm (from NASA DONKI) hits today. Inside, the crew gets extra radiation dose.',

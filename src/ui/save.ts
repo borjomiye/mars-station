@@ -9,6 +9,9 @@ export function loadGame(): GameState | null {
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
     const s = JSON.parse(raw) as GameState;
+    // saves from before the Easy/Medium/Hard modes
+    const old: Record<string, GameState['mode']> = { cadet: 'easy', commander: 'medium' };
+    if (old[s.mode]) s.mode = old[s.mode];
     return s.version === SAVE_VERSION && s.phase !== 'report' ? s : null;
   } catch {
     return null;

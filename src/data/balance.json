@@ -1,5 +1,5 @@
 {
-  "_note": "All game numbers. Tune with `npm run simulate` and playtests. `base` = Commander; `modes` override it per mode; `bot` = mistake chances of the sloppy test bot. Owner: P5 (game design).",
+  "_note": "All game numbers. Tune with `npm run simulate` and playtests. `base` = numbers shared by all modes (the schedule uses only these); `modes` = Easy / Medium / Hard overrides; `bot` = mistake chances of the sloppy test bot. Owner: P5 (game design).",
   "_sources": {
     "DOSE_INDOOR_PER_SOL": "Curiosity RAD, Hassler et al., Science 2014 (doi:10.1126/science.1244797): about 0.64-0.67 mSv/day on the surface. VERIFY before demo.",
     "STORM_MULT_BY_DAY": "Curiosity saw a 2-3x rise for about two days in Sept 2017 (NASA/JPL). Game value.",
@@ -220,18 +220,36 @@
     "MAX_REAL_EVENTS_PER_SOL": 2
   },
   "modes": {
-    "cadet": {
-      "AIR_START": 8,
-      "FOOD_START": 8,
+    "easy": {
+      "AIR_START": 9,
+      "FOOD_START": 9,
+      "ZERO_SOLS_TO_LOSE": 3,
       "STORM_MULT_BY_DAY": [
         2,
         1.5
       ],
       "AUTO_FORECAST_SOLS": 1,
       "HELPER_ALWAYS_ON": true,
-      "SHOW_MSV": false
+      "SHOW_MSV": false,
+      "SCIENCE_TARGET": 18
     },
-    "commander": {}
+    "medium": {
+      "AIR_START": 8,
+      "FOOD_START": 8,
+      "STORM_MULT_BY_DAY": [
+        2.5,
+        1.5
+      ],
+      "AUTO_FORECAST_SOLS": 1,
+      "HELPER_ALWAYS_ON": true
+    },
+    "hard": {
+      "AIR_START": 6,
+      "FOOD_START": 5,
+      "ZERO_SOLS_TO_LOSE": 1,
+      "SCIENCE_TARGET": 21,
+      "AIR_LOSS_PER_MISSING_CELL": 2
+    }
   },
   "bot": {
     "lifeShort": 0.2,

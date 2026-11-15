@@ -22,7 +22,7 @@ export default function App() {
   const [picking, setPicking] = useState<Picking | null>(null);
   const [win, setWin] = useState<Window>(null);
   const [name, setName] = useState(() => randomMissionName());
-  const [mode, setMode] = useState<Mode>('cadet');
+  const [mode, setMode] = useState<Mode>('easy');
   const [manual, setManual] = useState<{ sol: number; ids: string[] }>({ sol: 0, ids: [] }); // jobs the captain set by hand this sol
 
   /** Every engine step goes through here: save the mission, keep found cards in the album. */
