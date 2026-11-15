@@ -38,7 +38,8 @@ export function resultNotes(prev: GameState | null, s: GameState): Notes {
   const found = prev ? s.cards.found.filter((id) => !prev.cards.found.includes(id)) : [];
   for (const id of found) {
     const k = cardDef(id);
-    add(k.kind === 'lab' ? 'lab' : k.kind === 'chance' ? 'outside' : 'radio', { text: `New card: ${k.title}`, icon: 'card-back', tone: 'good' });
+    const again = (s.cards.owned ?? []).includes(id); // already in the album from an earlier mission
+    add(k.kind === 'lab' ? 'lab' : k.kind === 'chance' ? 'outside' : 'radio', { text: again ? `Seen again: ${k.title}` : `New card: ${k.title}`, icon: 'card-back', tone: again ? 'plain' : 'good' });
   }
   if (prev && s.samples > prev.samples) add('outside', { text: `Sample +${fmt(s.samples - prev.samples)}`, icon: 'rock-sample', tone: 'good' });
 

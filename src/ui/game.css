@@ -617,3 +617,15 @@ button.pick:hover .pick-tip, button.pick:focus-visible .pick-tip { display: bloc
 .hud-meter-label { gap: 6px; }
 .hud-meter-label span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .hud-meter-label b { white-space: nowrap; flex: none; }
+/* the dice sits in the middle of the name field (the global button margin pushed it up) */
+.name-field .dice { margin: 0; align-self: center; }
+/* top-bar flags ("storm ×2", "8 sols") stay on one line inside the bar */
+.hud-flags .flag { white-space: nowrap; line-height: 1.1; font-size: 18px; padding: 3px 7px; }
+.hud-flags .flag img { width: 18px; height: 18px; }
+/* crowded top bar (storm + tasks): nothing wraps */
+.hud { gap: 10px; }
+.hud-sky > div, .hud-sky span { white-space: nowrap; }
+.hud-meter { width: 150px; }
+/* a crowded room (everyone in the shelter): names on hover or when picked */
+.st-crew.crowded .st-name { opacity: 0; transition: opacity 0.15s; }
+.st-crew.crowded:hover .st-name, .st-crew.crowded.selected .st-name, .st-crew.crowded:focus-within .st-name { opacity: 1; z-index: 3; }
