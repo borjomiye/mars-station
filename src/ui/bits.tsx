@@ -146,6 +146,7 @@ export function talkOf(s: GameState, withStatus = true): Beat[] {
   for (const a of m.answers) out.push({ kind: 'earth', text: `Earth: ${a}` });
   if (withStatus || s.sol === 1) for (const l of m.lines) out.push({ kind: 'say', text: l });
   for (const l of m.notes) out.push({ kind: 'alert', text: l });
+  for (const l of m.news ?? []) out.push({ kind: 'good', text: l }); // Mission Control task results
   if (m.storm) out.push({ kind: 'alert', text: `Solar storm today: dose x${m.storm.mult} unless the shield is fully powered.` });
   if (m.blackout) out.push({ kind: 'alert', text: 'Radio blackout today: the Sun is between Mars and Earth.' });
   return out;

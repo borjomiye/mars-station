@@ -123,7 +123,7 @@ export type SolRecord = {
   sol: number; supply: number; cells: Record<SystemId, number>; jobs: Record<string, EffectiveJob>;
   air: { d: number; key: string }[]; harvests: number; choice: string | null;
 };
-export type Morning = { lines: string[]; notes: string[]; answers: string[]; unlocked: string[]; words: string[] };
+export type Morning = { lines: string[]; notes: string[]; answers: string[]; unlocked: string[]; words: string[]; news: string[] }; // news: Mission Control task results
 export type RadioMessageId = 'forecast' | 'fix' | 'doctors' | 'science';
 export type MessageOption = { id: RadioMessageId; label: string; plus: string; minus: string; enabled: boolean; why: string };
 export type Forecast = { sol: number; weather: Weather; cells: number; storm: number | null };
@@ -158,7 +158,7 @@ export type GameState = {
   today: { revealed: boolean; choice: ChosenChoice | null; sickId: string | null; skipEvent: boolean; before: { air: number; food: number; crop: number; science: number } | null };
   radio: { queue: { id: RadioMessageId; sol: number }[]; sent: number };
   known: number[];         // sols the player has a forecast for
-  cards: { found: string[]; sent: string[] };
+  cards: { found: string[]; sent: string[]; owned?: string[] }; // owned: already in the player's album when the mission started
   morning: Morning;
   lastResults: ResultLine[];
   log: SolRecord[];

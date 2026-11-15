@@ -173,8 +173,10 @@ export function Station({ s, height, selected, onSelect, onJob, overlay, notes }
         const list = notes[id] ?? [];
         if (!list.length) return null;
         const r = id === 'outside' ? { x: -GUTTER + 6, y: GROUND - 150, w: GUTTER + 10, h: 100 } : board.rooms[id];
+        // the dome is tall, so its notes fit inside above the heads; the low modules get theirs above the roof, so no face is covered
+        const above = id !== 'greenhouse' && id !== 'outside';
         return (
-          <ul key={id} className="st-notes" style={{ left: X(r.x + r.w / 2), top: Y(r.y) + (id === 'greenhouse' ? 44 : 30) }} aria-label={id === 'outside' ? 'Outside' : board.rooms[id].name}>
+          <ul key={id} className={`st-notes${above ? ' above' : ''}`} style={{ left: X(r.x + r.w / 2), top: above ? Y(r.y) - 34 : Y(r.y) + (id === 'greenhouse' ? 44 : 30) }} aria-label={id === 'outside' ? 'Outside' : board.rooms[id].name}>
             {list.map((n, i) => (
               <li key={i} className={`st-note ${n.tone}`} style={{ animationDelay: `${(k * 3 + i) * 0.18}s` }}>
                 <img src={icon(n.icon)} alt="" />{n.text}

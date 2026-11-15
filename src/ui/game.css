@@ -567,3 +567,45 @@ button.pick:hover .pick-tip, button.pick:focus-visible .pick-tip { display: bloc
 .card-toast-text { display: grid; line-height: 1.05; min-width: 150px; }
 .card-toast-text span { font: 400 11px var(--font-pixel); color: var(--energy); text-transform: uppercase; }
 .card-toast-text b { font-size: 26px; }
+
+/* ---------- layout fixes (review of 2026-11-15) ---------- */
+/* morning bubble: never squeezed smaller than its text (the robot shrinks instead); long talk scrolls inside */
+.brief-bubble { flex: 0 0 auto; overflow: hidden; }
+.brief-lines { padding-right: 6px; scrollbar-gutter: stable; }
+/* "Opens today": readable body font instead of a scaled-down pixel font, and air before the new words */
+.brief-new { gap: 14px; }
+.brief-unlock { align-items: center; }
+.brief-unlock span:first-child { font-size: 22px; }
+.brief-unlock strong { font: 32px/1 var(--font-body); color: var(--outline); }
+/* top bar: a long mission name stays inside its box */
+.hud-sol > div { min-width: 0; max-width: 170px; }
+.hud-sol b { white-space: nowrap; }
+.hud-sol span { display: block !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* result notes above the low modules: anchored by their bottom edge */
+.st-notes.above { transform: translate(-50%, -100%); }
+
+/* Mission Control: easy to spot everywhere */
+.tasks-btn { background: var(--energy) !important; color: var(--outline) !important; box-shadow: 0 0 0 3px var(--outline), 0 5px 0 3px var(--mars-dark) !important; }
+.brief-mc { display: grid; gap: 8px; min-width: 0; }
+.brief-mc-setup { font-size: 21px; line-height: 1.1; }
+.brief-mc-setup b { color: var(--mars-dark); }
+.brief-tasks { display: grid; gap: 6px; }
+.brief-tasks li { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 5px 10px; background: var(--brief-paper); border: 3px solid var(--outline); box-shadow: 3px 3px 0 var(--outline); font-size: 22px; line-height: 1.05; }
+.brief-tasks li .brief-tag { background: var(--energy); }
+.brief-tasks li.done .brief-tag { background: var(--brief-green); color: var(--brief-board); }
+.brief-tasks li.failed { opacity: 0.6; }
+.brief-tasks li.failed .brief-tag { background: var(--brief-dim); }
+.brief-tasks li b { font-size: 19px; color: var(--brief-green); }
+.task-pin {
+  position: absolute; right: 14px; top: 12px; z-index: 6; max-width: 330px; padding: 8px 12px 10px;
+  background: var(--chip-bg); border-radius: var(--radius); box-shadow: 0 0 0 3px var(--energy), 5px 5px 0 3px var(--outline);
+}
+.task-pin-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; font: 11px var(--font-pixel); color: var(--energy); text-transform: uppercase; }
+.task-pin-head img { width: 18px; height: 18px; object-fit: contain; }
+.task-pin ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; font-size: 20px; line-height: 1.05; }
+.task-pin b { color: var(--science); }
+.brief-tasks { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.brief-tasks li { grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 8px; row-gap: 0; font-size: 20px; }
+.brief-tasks li .brief-tag { grid-row: 1 / 3; }
+.brief-tasks li b { font-size: 17px; }
+.brief-mc-setup span { color: var(--brief-muted); font-size: 18px; }

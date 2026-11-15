@@ -166,7 +166,8 @@ export function enterMedbay(s: GameState, p: CrewMember, steps: number, cause: s
 export function findCard(s: GameState, id: string | null | undefined, say?: (t: string, why: string) => void, why = ''): boolean {
   if (!id || s.cards.found.includes(id)) return false;
   s.cards.found.push(id);
-  if (say) say(t('rules.cardFound', { title: cardDef(id).title }), why);
+  const title = cardDef(id).title;
+  if (say) say((s.cards.owned ?? []).includes(id) ? t('rules.cardFoundAgain', { title }) : t('rules.cardFound', { title }), why);
   return true;
 }
 export function know(s: GameState, sol: number): void {

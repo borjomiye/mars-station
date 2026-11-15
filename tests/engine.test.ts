@@ -267,6 +267,13 @@ describe('lab, science and radio', () => {
 });
 
 describe('data and state machine', () => {
+  it('the lab brings a card the album does not have yet, and says when a card is seen again', () => {
+    const lab = cards.filter((k) => k.kind === 'lab').map((k) => k.id), missing = lab[lab.length - 1];
+    const s = run(mk(6, (t) => { t.samples = 1; t.cards.owned = lab.filter((id) => id !== missing); }), plan({ lab: 2 }, { otto: 'lab' }));
+    expect(s.cards.found).toContain(missing);
+    const again = run(mk(6, (t) => { t.samples = 1; t.cards.owned = lab.slice(); }), plan({ lab: 2 }, { otto: 'lab' }));
+    expect(again.lastResults.some((r) => r.t.startsWith('Seen again'))).toBe(true);
+  });
   it('the album has 27 cards, each with a title, a hint, a NASA photo file and a source link', () => {
     expect(cards).toHaveLength(27);
     for (const k of cards) {

@@ -1,7 +1,7 @@
 import { t } from './text';
 import type { ChosenChoice, CrewMember, EffectiveJob, Forecast, GameState, MessageOption, Mode, Morning, Phase, Plan, RadioMessageId, RealEvent, ResultLine, SolRecord, Storm } from './types';
 import { MODES, SYSTEMS } from './types';
-import { cardDef, cards, cfg, crewDefs, siteDef, taskDef, twistDef, words } from './content';
+import { cardDef, cards, cfg, crewDefs, siteDef, words } from './content';
 import { missionSetup, taskText, updateTasks } from './tasks';
 import { hashString } from './rng';
 import { buildSchedule, normSeed, prettyName } from './schedule';
@@ -73,7 +73,7 @@ function nextSol(s: GameState): GameState {
   const c = cfg(s), prev = s.sol >= 1 ? today(s) : null, last = s.log[s.log.length - 1];
   if (s.sol >= 1) go(s, 'briefing'); else s.phase = 'briefing';
   s.sol++;
-  const day = today(s), M: Morning = { lines: [], notes: [], answers: [], unlocked: [], words: [] };
+  const day = today(s), M: Morning = { lines: [], notes: [], answers: [], unlocked: [], words: [], news: [] };
   if (s.sol === 1) {
     M.lines.push(t('sol.landingDoneTheStationIs'));
     if (s.siteId) {
@@ -82,11 +82,8 @@ function nextSol(s: GameState): GameState {
       findCard(s, site.card);
     }
     M.lines.push(t('sol.theShipHomeLandsOn', { missionSols: c.MISSION_SOLS }));
-    if (s.twistId) {
-      const tw = twistDef(s.twistId);
-      M.notes.push(t('sol.missionTwistName', { name: tw.name }), t('sol.twistGood', { plus: tw.plus }), t('sol.twistBad', { minus: tw.minus }));
-    }
-    for (const task of s.tasks) M.notes.push(t('sol.missionControlAsks', { task: taskText(taskDef(task.id)) }));
+    // the twist and the tasks are shown on the morning board ("Mission Control"), not read out
+    if (s.tasks.length) M.lines.push(t('sol.missionControlSentTasks', { count: s.tasks.length }));
   } else {
     const steps = t('sol.ofSteps', { crop: fmt(s.crop), cropStepsToHarvest: c.CROP_STEPS_TO_HARVEST });
     M.lines.push(last && last.harvests ? t('sol.harvestCameInNewCrop', { steps }) : t('sol.greenhouseCropIsAt', { steps }));
@@ -108,7 +105,7 @@ function nextSol(s: GameState): GameState {
   for (let k = 1; k <= c.AUTO_FORECAST_SOLS; k++) know(s, s.sol + k);
   // Mission Control checks the tasks whose last sol has passed
   for (const { def, task } of updateTasks(s, false)) {
-    M.notes.push(task.status === 'done' ? t('sol.taskDoneNote', { task: taskText(def), reward: def.reward }) : t('sol.taskMissedNote', { task: taskText(def) }));
+    M.news.push(task.status === 'done' ? t('sol.taskDoneNote', { task: taskText(def), reward: def.reward }) : t('sol.taskMissedNote', { task: taskText(def) }));
   }
   for (const k of SYSTEMS) if (c.SYSTEMS[k].unlockSol === s.sol && s.sol > 1) M.unlocked.push(c.SYSTEMS[k].name);
   if (s.sol === c.JOB_UNLOCK_SOL) M.unlocked.push(t('sol.crewJobs'));
@@ -137,7 +134,7 @@ function nextSol(s: GameState): GameState {
 }
 
 /** `setup` overrides what the mission name picks; '' = no landing site / no twist (plain numbers, used by the tests). */
-export function createMission(name: string, mode: Mode, setup: Partial<{ siteId: string; twistId: string; taskIds: string[] }> = {}): GameState {
+export function createMission(name: string, mode: Mode, setup: Partial<{ siteId: string; twistId: string; taskIds: string[]; owned: string[] }> = {}): GameState {
   const m: Mode = MODES.includes(mode) ? mode : 'medium', seed = normSeed(name), sched = buildSchedule(seed);
   const pick = { ...missionSetup(seed), ...setup }, c = cfg({ mode: m, siteId: pick.siteId, twistId: pick.twistId });
   const air = clamp(c.AIR_START, 0, c.TANK_MAX), startDose = c.START_DOSE ?? 0;
@@ -150,8 +147,8 @@ export function createMission(name: string, mode: Mode, setup: Partial<{ siteId:
     supply: 0, supplyNotes: [], battery: 0, panelBoost: null,
     plan: { cells: { life: c.SYSTEMS.life.want, shield: 0, greenhouse: c.SYSTEMS.greenhouse.want, radio: 0, lab: 0 }, jobs: {} },
     today: { revealed: false, choice: null, sickId: null, skipEvent: false, before: null },
-    radio: { queue: [], sent: 0 }, known: [], cards: { found: [], sent: [] },
-    morning: { lines: [], notes: [], answers: [], unlocked: [], words: [] }, lastResults: [], log: [], seenWords: [],
+    radio: { queue: [], sent: 0 }, known: [], cards: { found: [], sent: [], owned: pick.owned ?? [] },
+    morning: { lines: [], notes: [], answers: [], unlocked: [], words: [], news: [] }, lastResults: [], log: [], seenWords: [],
     flags: { panelsCovered: false, prefill: null },
     counters: { airZero: 0, foodZero: 0, harvests: 0, medbaySols: 0, samples: 0, airLow: air }, over: null,
   };
@@ -345,7 +342,9 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
       made = true;
       // the mission name decides where in the list of lab finds this mission starts, so new missions bring new lab cards
       const lab = cards.filter((k) => k.kind === 'lab'), start = hashString(s.seed + ':lab') % lab.length;
-      const next = [...lab.slice(start), ...lab.slice(0, start)].find((k) => !s.cards.found.includes(k.id));
+      const order = [...lab.slice(start), ...lab.slice(0, start)], owned = s.cards.owned ?? [];
+      // cards already in the album come last, so a new mission brings new lab finds first
+      const next = order.find((k) => !s.cards.found.includes(k.id) && !owned.includes(k.id)) ?? order.find((k) => !s.cards.found.includes(k.id));
       if (next) findCard(s, next.id, say, t('sol.studiedASample', { name: p.name }));
       else say(t('sol.sampleStudiedNothingNew'), t('sol.allLabCardsAreFound'));
     }

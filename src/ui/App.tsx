@@ -43,7 +43,7 @@ export default function App() {
     // cards found by this step pop up as a banner (a new mission starts with an empty list)
     const sameMission = s && s.seed === next.seed && s.phase !== 'report' && next.sol >= s.sol;
     const before = sameMission ? s.cards.found : [];
-    const found = next.cards.found.filter((id) => !before.includes(id));
+    const found = next.cards.found.filter((id) => !before.includes(id) && !album.includes(id)); // only cards new to the album pop up
     if (found.length) setFresh((f) => [...f.filter((id) => !found.includes(id)), ...found]);
     if (!sameMission) setFresh(found);
     setPicking(null);
@@ -72,12 +72,12 @@ export default function App() {
     screen = (
       <TitleScreen
         name={name} setName={setName} onRandom={() => setName(randomMissionName())} mode={mode} setMode={setMode}
-        onLaunch={() => set(createMission(name || 'Brave Otter', mode))} saved={saved} onContinue={() => saved && setState(saved)}
+        onLaunch={() => set(createMission(name || 'Brave Otter', mode, { owned: album }))} saved={saved} onContinue={() => saved && setState(saved)}
         onAlbum={() => setWin('album')} onData={() => setWin('data')} albumCount={album.length}
       />
     );
   } else if (s.phase === 'report') {
-    screen = <ReportScreen s={s} album={album} onAgain={() => set(createMission(s.name, s.mode))} onNew={() => { setName(randomMissionName()); toMenu(); }} />;
+    screen = <ReportScreen s={s} album={album} onAgain={() => set(createMission(s.name, s.mode, { owned: album }))} onNew={() => { setName(randomMissionName()); toMenu(); }} />;
   } else if (s.phase === 'briefing') {
     screen = <MorningScreen key={s.sol} s={s} onNext={() => { setManual({ sol: s.sol, ids: [] }); set(withAutoJobs(startPlanning(s), [])); }} />;
   } else {

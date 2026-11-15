@@ -2,7 +2,7 @@
 // along the bottom, the robot's hint in the sky. After playing, the same screen shows the results.
 import { useState, type ReactNode } from 'react';
 import {
-  SYSTEMS, cellsAvailable, cfg, currentEvent, doseFor, fmt, fmt2, isBlackout, isUnlocked, planTotal, plural, previewSol, radioBlocked, radioCanSend, radioOffReason, stormOn,
+  SYSTEMS, cellsAvailable, cfg, currentEvent, doseFor, fmt, fmt2, isBlackout, isUnlocked, planTotal, plural, previewSol, radioBlocked, radioCanSend, radioOffReason, stormOn, taskDef, taskText,
   type GameState, type Job, type SystemId,
 } from '../engine';
 import { SYSTEM_ICON, icon, robotArt } from './art';
@@ -71,7 +71,7 @@ export function PlanBase({ s, onCells, onJob, onDone }: PlanProps) {
   return (
     <>
       <Station s={s} height={STAGE_H} selected={selected} onSelect={setSelected} onJob={onJob}
-        overlay={<Helper s={s} onWhy={() => setWhy(true)} extra={<button className="secondary icon-btn" data-sfx="open" onClick={() => setMorning(true)} aria-label="Morning report" title="Morning report"><ReportGlyph /></button>} />} />
+        overlay={<><Helper s={s} onWhy={() => setWhy(true)} extra={<button className="secondary icon-btn" data-sfx="open" onClick={() => setMorning(true)} aria-label="Morning report" title="Morning report"><ReportGlyph /></button>} /><TaskPin s={s} /></>} />
       <div className="controls">
         <div className={`free${free > 0 ? ' alert' : ''}`}>
           <span>Free cells</span>
@@ -112,6 +112,18 @@ export function PlanBase({ s, onCells, onJob, onDone }: PlanProps) {
       {morning && <Overlay title={`This morning · sol ${s.sol}`} onClose={() => setMorning(false)}><MorningRecap s={s} /></Overlay>}
       {why && <WhyWindow s={s} onClose={() => setWhy(false)} />}
     </>
+  );
+}
+
+/** Open Mission Control tasks, pinned in the sky while the captain plans the sol. */
+function TaskPin({ s }: { s: GameState }) {
+  const open = s.tasks.filter((x) => x.status === 'open');
+  if (!open.length) return null;
+  return (
+    <aside className="task-pin" aria-label="Mission Control tasks">
+      <span className="task-pin-head"><img src={icon('radio')} alt="" />Mission Control</span>
+      <ul>{open.map((x) => { const d = taskDef(x.id); return <li key={x.id}>{taskText(d)} <b>+{d.reward}</b></li>; })}</ul>
+    </aside>
   );
 }
 
