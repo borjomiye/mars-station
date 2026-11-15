@@ -1,5 +1,83 @@
 {
-  "stub": true,
-  "_note": "Owner: P4. 10-15 real health facts from NASA OSDR (https://osdr.nasa.gov). Each needs textKey (in en.json), study title and link. Do not invent facts.",
-  "facts": []
+  "stub": false,
+  "_note": "Owner: P4. Space biology facts from NASA OSDR (Open Science Data Repository). Each text only says what the study page itself says (checked 2026-11-15). Cards point here with factId. Do not invent facts.",
+  "facts": [
+    {
+      "id": "osd342_muscle_bone",
+      "osd": "OSD-342",
+      "study": "Targeting myostatin/activin A protects against skeletal muscle and bone loss during spaceflight",
+      "text": "Mice that spent 33 days on the Space Station lost muscle and bone. Scientists study this to protect astronauts on long trips.",
+      "link": "https://osdr.nasa.gov/bio/repo/data/studies/OSD-342"
+    },
+    {
+      "id": "osd480_plant_gravity",
+      "osd": "OSD-480",
+      "study": "Plant Gravity Perception (PGP) Flight Study",
+      "text": "Plants can feel which way is down. On the Space Station, scientists spun seedlings in a centrifuge to give them different gravity, from almost none up to Earth's.",
+      "link": "https://osdr.nasa.gov/bio/repo/data/studies/OSD-480"
+    },
+    {
+      "id": "osd268_veggie_lettuce",
+      "osd": "OSD-268",
+      "study": "Microbiological and nutritional analysis of lettuce crops grown on the International Space Station-VEG01B",
+      "text": "Astronauts grew lettuce in the Veggie garden on the Space Station. Then it was sent back to Earth, where scientists checked its germs and nutrients.",
+      "link": "https://osdr.nasa.gov/bio/repo/data/studies/OSD-268"
+    },
+    {
+      "id": "osd67_station_germs",
+      "osd": "OSD-67",
+      "study": "Microbial Observatory (ISS-MO): Study of BSL-2 bacterial isolates from the International Space Station",
+      "text": "Germs live on the Space Station too. Scientists collected some of them, and many could resist several germ-fighting medicines (antibiotics).",
+      "link": "https://osdr.nasa.gov/bio/repo/data/studies/OSD-67"
+    },
+    {
+      "id": "osd678_light_dark",
+      "osd": "OSD-678",
+      "study": "Light has a principal role in the Arabidopsis transcriptomic response to the spaceflight environment",
+      "text": "Small plants grew on the Space Station in the light and in the dark. Their leaves reacted to space more than their root tips, and light made a big difference.",
+      "link": "https://osdr.nasa.gov/bio/repo/data/studies/OSD-678"
+    },
+    {
+      "id": "osd396_bone_healing",
+      "osd": "OSD-396",
+      "study": "Gene-metabolite networks associated with impediment of bone fracture repair in spaceflight",
+      "text": "Space can make it harder for broken bones to heal. Mice with a small bone injury lived on the Space Station for about 4 weeks so scientists could study it.",
+      "link": "https://osdr.nasa.gov/bio/repo/data/studies/OSD-396"
+    },
+    {
+      "id": "osd758_spin_eyes",
+      "osd": "OSD-758",
+      "study": "Artificial Gravity Attenuates the Transcriptomic Response to Spaceflight in the Optic Nerve and Retina -- Retina data",
+      "text": "Weightlessness can stress the eyes. When mice on the Space Station were spun to make artificial gravity, their eyes changed less.",
+      "link": "https://osdr.nasa.gov/bio/repo/data/studies/OSD-758"
+    },
+    {
+      "id": "osd622_dwarf_wheat",
+      "osd": "OSD-622",
+      "study": "Microgravity effects on leaf morphology, cell structure, carbon metabolism and mRNA expression of dwarf wheat",
+      "text": "In 2002, dwarf wheat grew in space for 73 days, and the crew harvested it 7 times.",
+      "link": "https://osdr.nasa.gov/bio/repo/data/studies/OSD-622"
+    },
+    {
+      "id": "osd536_mouse_brain",
+      "osd": "OSD-536",
+      "study": "Gene expression profiling for spaceflight induced-neuroinflammation in the mouse brain",
+      "text": "Mice spent 35 days on the Space Station. Back on Earth, 54 genes in their brains worked differently, many of them linked to stress and inflammation.",
+      "link": "https://osdr.nasa.gov/bio/repo/data/studies/OSD-536"
+    },
+    {
+      "id": "osd570_inspiration4",
+      "osd": "OSD-570",
+      "study": "SpaceX Inspiration4 PBMC Profiling: snRNA-seq, snATAC-seq, and T-cell and B-cell repertoire profiling",
+      "text": "In 2021, four private astronauts flew around Earth for 3 days. They gave blood before and after the flight so scientists could study their immune cells.",
+      "link": "https://osdr.nasa.gov/bio/repo/data/studies/OSD-570"
+    },
+    {
+      "id": "osd202_radiation_test",
+      "osd": "OSD-202",
+      "study": "Low dose (0.04 Gy) irradiation (LDR) and hindlimb unloading (HLU) microgravity in mice: brain transcriptomic and epigenomic data",
+      "text": "Space dangers can be tested on Earth too. For 21 days, mice got a small dose of radiation while their back legs were lifted off the ground to copy weightlessness.",
+      "link": "https://osdr.nasa.gov/bio/repo/data/studies/OSD-202"
+    }
+  ]
 }
