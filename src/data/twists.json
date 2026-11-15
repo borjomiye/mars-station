@@ -1,0 +1,71 @@
+{
+  "_note": "Mission twists: one per mission, picked by the mission name. Like real mission planning, every gain costs something (a rocket can carry only so much). Same `patch` format as sites.json. Owner: P5.",
+  "twists": [
+    {
+      "id": "extra_food",
+      "name": "Extra food on board",
+      "plus": "Start with 2 more food",
+      "minus": "Food crates took the lab spare parts: each sample needs more lab work",
+      "patch": {
+        "add": {
+          "FOOD_START": 2,
+          "LAB_WORK_PER_SAMPLE": 1
+        }
+      }
+    },
+    {
+      "id": "battery",
+      "name": "Battery pack",
+      "plus": "Up to 2 unused cells are saved for tomorrow",
+      "minus": "The battery took an air tank's place: start with less air & water",
+      "patch": {
+        "set": {
+          "BATTERY_CAPACITY": 2
+        },
+        "add": {
+          "AIR_START": -1
+        }
+      }
+    },
+    {
+      "id": "veterans",
+      "name": "Veteran crew",
+      "plus": "Experienced: 3 heavy sols in a row before anyone gets tired",
+      "minus": "They already got 3 mSv of radiation on earlier missions",
+      "patch": {
+        "set": {
+          "HEAVY_SOLS_TO_TIRED": 3
+        },
+        "add": {
+          "START_DOSE": 3
+        }
+      }
+    },
+    {
+      "id": "water_walls",
+      "name": "Water-wall shelter",
+      "plus": "The storm shelter has walls of water: half the dose inside it",
+      "minus": "Filling the walls used water: start with less air & water",
+      "patch": {
+        "set": {
+          "SHELTER_EXPOSURE": 0.25
+        },
+        "add": {
+          "AIR_START": -1
+        }
+      }
+    },
+    {
+      "id": "new_panels",
+      "name": "Brand-new solar panels",
+      "plus": "1 more cell on clear sols",
+      "minus": "Panels took a science instrument's place: the science goal is 2 higher",
+      "patch": {
+        "add": {
+          "CELLS_BY_WEATHER.clear": 1,
+          "SCIENCE_TARGET": 2
+        }
+      }
+    }
+  ]
+}

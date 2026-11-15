@@ -150,7 +150,7 @@ function Card({ art, name, badge, tone, children }: { art: string; name: string;
 }
 
 function Status({ s }: { s: GameState }) {
-  const c = cfg(s.mode), last = s.log[s.log.length - 1];
+  const c = cfg(s), last = s.log[s.log.length - 1];
   const harvested = !!last && last.harvests > 0, need = c.CROP_STEPS_TO_HARVEST, grown = Math.min(need, Math.floor(s.crop + 1e-9));
   const med = s.crew.filter((p) => p.medbay > 0), open = s.problems;
   return (

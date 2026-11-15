@@ -68,6 +68,21 @@
       "title": "Wind cleaned the panels",
       "line": "A gust blew the dust off the solar panels.",
       "card": null
+    },
+    "phobos_eclipse": {
+      "title": "Phobos crosses the Sun",
+      "line": "Phobos, a tiny moon of Mars, will pass in front of the Sun today.",
+      "card": "phobos_eclipse"
+    },
+    "iron_meteorite": {
+      "title": "A shiny dark rock",
+      "line": "A heavy, shiny rock lies on the sand. It doesn't look like Mars rock.",
+      "card": "iron_meteorite"
+    },
+    "twilight_clouds": {
+      "title": "Glowing clouds",
+      "line": "Thin clouds are glowing in the evening sky.",
+      "card": "twilight_clouds"
     }
   }
 }

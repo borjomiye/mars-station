@@ -10,5 +10,6 @@ export {
   addProblem, badgeOf, cellsAvailable, crewById, currentEvent, dayAt, doseFor, effectiveCells, effectiveJobs, energyOf, enterMedbay, eventChoices,
   fmt, fmt2, isBlackout, isUnlocked, jobAllowed, knownForecast, planTotal, plural, problemEffect, problemNeed, radioBlocked, sanitizePlan, stormOn, today, wordCount, workPower,
 } from './rules';
-export { cfg, cards, cardDef, donki, doseComparison, facts, getPeriod, botBalance, type Balance } from './content';
+export { cfg, cards, cardDef, donki, doseComparison, facts, getPeriod, botBalance, sites, twists, siteDef, twistDef, taskDef, type Balance } from './content';
+export { missionSetup, taskText } from './tasks';
 export { hashString, mulberry32 } from './rng';

@@ -19,12 +19,12 @@ export function crewById(s: GameState, id: string): CrewMember {
   if (!p) throw new Error(`Unknown crew member: ${id}`);
   return p;
 }
-export function isUnlocked(s: GameState, sys: SystemId): boolean { return s.sol >= cfg(s.mode).SYSTEMS[sys].unlockSol; }
-export function isBlackout(s: GameState, sol = s.sol): boolean { return cfg(s.mode).BLACKOUT_SOLS.includes(sol); }
+export function isUnlocked(s: GameState, sys: SystemId): boolean { return s.sol >= cfg(s).SYSTEMS[sys].unlockSol; }
+export function isBlackout(s: GameState, sol = s.sol): boolean { return cfg(s).BLACKOUT_SOLS.includes(sol); }
 export function stormOn(s: GameState, sol = s.sol): (Storm & { mult: number }) | null {
   const d = dayAt(s, sol);
   if (!d || !d.storm) return null;
-  return { ...d.storm, mult: cfg(s.mode).STORM_MULT_BY_DAY[d.storm.day] ?? 1 };
+  return { ...d.storm, mult: cfg(s).STORM_MULT_BY_DAY[d.storm.day] ?? 1 };
 }
 export function badgeOf(c: Balance, dose: number): Badge { return dose >= c.BADGE_RED_MSV ? 'red' : dose >= c.BADGE_AMBER_MSV ? 'amber' : 'green'; }
 export function problemNeed(c: Balance, p: Problem): number {
@@ -38,7 +38,7 @@ export function problemEffect(c: Balance, p: Problem): string {
   if (d.cellsLost) return t('rules.text2', { severity: plural(d.cellsLost * p.severity, 'cell') });
   return '';
 }
-export function radioBlocked(s: GameState): boolean { const c = cfg(s.mode); return s.problems.some((p) => c.PROBLEMS[p.type].blocksRadio); }
+export function radioBlocked(s: GameState): boolean { const c = cfg(s); return s.problems.some((p) => c.PROBLEMS[p.type].blocksRadio); }
 
 export function currentEvent(s: GameState): GameEvent | null {
   const d = today(s);
@@ -49,12 +49,12 @@ export function currentEvent(s: GameState): GameEvent | null {
 }
 export function cellsAvailable(s: GameState): number {
   const ch = s.today.choice;
-  return s.supply + (ch && ch.id === 'use_now' ? cfg(s.mode).WIND_BONUS_CELLS : 0);
+  return s.supply + (ch && ch.id === 'use_now' ? cfg(s).WIND_BONUS_CELLS : 0);
 }
 export function planTotal(plan: Plan): number { return SYSTEMS.reduce((a, k) => a + (plan.cells[k] || 0), 0); }
 
 export function jobAllowed(s: GameState, p: CrewMember, j: Job): { ok: boolean; why: string } {
-  const c = cfg(s.mode);
+  const c = cfg(s);
   if (p.medbay > 0) return { ok: false, why: t('rules.inTheMedbay') };
   if (s.sol < c.JOB_UNLOCK_SOL) return { ok: j === 'rest', why: t('rules.jobsOpenOnSol', { jobUnlockSol: c.JOB_UNLOCK_SOL }) };
   if (j === 'outside' && p.grounded) return { ok: false, why: t('rules.redBadgeStaysInside') };
@@ -64,7 +64,7 @@ export function jobAllowed(s: GameState, p: CrewMember, j: Job): { ok: boolean; 
 
 /** Makes any plan legal: locked systems get 0, cells never exceed the supply, jobs are allowed. */
 export function sanitizePlan(s: GameState, plan: Plan): Plan {
-  const c = cfg(s.mode);
+  const c = cfg(s);
   const cells = {} as Record<SystemId, number>, jobs: Record<string, Job> = {};
   for (const k of SYSTEMS) {
     let v = Math.floor(Number(plan.cells?.[k]) || 0);
@@ -97,7 +97,7 @@ export function effectiveCells(s: GameState): Record<SystemId, number> {
 
 /** Jobs after the medbay and the event choice. */
 export function effectiveJobs(s: GameState): Record<string, EffectiveJob> {
-  const c = cfg(s.mode), out: Record<string, EffectiveJob> = {}, ev = currentEvent(s), ch = s.today.choice;
+  const c = cfg(s), out: Record<string, EffectiveJob> = {}, ev = currentEvent(s), ch = s.today.choice;
   for (const p of s.crew) {
     let j: EffectiveJob = s.plan.jobs[p.id] || 'rest';
     if (s.sol < c.JOB_UNLOCK_SOL) j = 'rest';
@@ -143,7 +143,7 @@ export function energyOf(c: Balance, p: CrewMember): number {
 
 export function forecastFor(s: GameState, sol: number): Forecast {
   const d = s.schedule[sol - 1], st = stormOn(s, sol);
-  return { sol, weather: d.weather, cells: cfg(s.mode).CELLS_BY_WEATHER[d.weather], storm: st ? st.mult : null };
+  return { sol, weather: d.weather, cells: cfg(s).CELLS_BY_WEATHER[d.weather], storm: st ? st.mult : null };
 }
 export function knownForecast(s: GameState): Forecast[] {
   return s.known.filter((n) => n > s.sol).sort((a, b) => a - b).map((n) => forecastFor(s, n));
@@ -152,7 +152,7 @@ export function knownForecast(s: GameState): Forecast[] {
 // ---------- mutating helpers (engine only, on a clone) ----------
 
 export function addProblem(s: GameState, type: string): Problem {
-  const old = s.problems.find((p) => p.type === type), c = cfg(s.mode);
+  const old = s.problems.find((p) => p.type === type), c = cfg(s);
   if (old) { old.severity = Math.min(c.PROBLEMS[type].maxSeverity, old.severity + 1); return old; }
   const p: Problem = { uid: ++s.uid, type, severity: 1, done: 0, age: 0, advice: 0 };
   s.problems.push(p);
@@ -170,13 +170,13 @@ export function findCard(s: GameState, id: string | null | undefined, say?: (t: 
   return true;
 }
 export function know(s: GameState, sol: number): void {
-  if (sol <= cfg(s.mode).MISSION_SOLS && !s.known.includes(sol)) s.known.push(sol);
+  if (sol <= cfg(s).MISSION_SOLS && !s.known.includes(sol)) s.known.push(sol);
 }
 
 // ---------- event choices: every one has a "+" and a "−" price ----------
 
 export function eventChoices(s: GameState): Choice[] {
-  const c = cfg(s.mode), ev = currentEvent(s), out: Choice[] = [];
+  const c = cfg(s), ev = currentEvent(s), out: Choice[] = [];
   if (!ev || !s.today.revealed) return out;
   const free = s.crew.filter((p) => p.medbay <= 0), canOut = free.filter((p) => !p.grounded);
   const add = (id: string, label: string, plus: string, minus: string, extra: Partial<Choice> = {}) =>

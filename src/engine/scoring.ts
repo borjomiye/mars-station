@@ -6,7 +6,7 @@ import { badgeOf, fmt, plural } from './rules';
 type Run = { a: number; b: number; zero: boolean };
 
 export function matteredMost(s: GameState): string {
-  const c = cfg(s.mode);
+  const c = cfg(s);
   if (!s.over || s.over.won) return '';
   if (s.over.why === 'food') {
     const want = c.SYSTEMS.greenhouse.want;
@@ -33,7 +33,7 @@ export function matteredMost(s: GameState): string {
 }
 
 export function endMission(s: GameState): MissionReport {
-  const c = cfg(s.mode), won = !!(s.over && s.over.won);
+  const c = cfg(s), won = !!(s.over && s.over.won);
   const badges = s.crew.map((p) => badgeOf(c, p.dose));
   const noMed = s.counters.medbaySols === 0, allGreen = badges.every((b) => b === 'green');
   const third = c.THIRD_STAR_RULE === 'medbay' ? noMed : c.THIRD_STAR_RULE === 'green' ? allGreen : noMed && allGreen;

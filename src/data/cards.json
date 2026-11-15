@@ -137,6 +137,101 @@
       "fact": "About every 26 months, Mars passes almost directly behind the Sun as seen from Earth. This is called solar conjunction.",
       "link": "https://images.nasa.gov/details/PIA16811",
       "photo": { "nasaId": "PIA16811", "alt": "Diagram: the Sun sits between Earth and Mars on their orbits", "credit": "NASA/JPL-Caltech" }
+    },
+    {
+      "id": "site_gale",
+      "title": "Gale Crater",
+      "kind": "milestone",
+      "hint": "Land in Gale Crater",
+      "fact": "NASA's Curiosity rover landed in Gale Crater in August 2012. A tall mountain, Mount Sharp, rises in the middle of the crater. Curiosity's RAD instrument measured the everyday Mars radiation dose that this game uses.",
+      "link": "https://images.nasa.gov/details/PIA14301",
+      "photo": { "nasaId": "PIA14301", "alt": "Gale Crater seen from orbit, with a mountain in its middle", "credit": "NASA/JPL-Caltech" }
+    },
+    {
+      "id": "site_jezero",
+      "title": "Jezero Crater",
+      "kind": "milestone",
+      "hint": "Land in Jezero Crater",
+      "fact": "NASA's Perseverance rover landed in Jezero Crater on February 18, 2021. Long ago a lake filled this crater, and a river left a fan-shaped delta. Old lake rocks are a good place to look for signs of ancient life.",
+      "link": "https://images.nasa.gov/details/PIA24350",
+      "photo": { "nasaId": "PIA24350", "alt": "Jezero Crater from orbit, with a circle marking Perseverance's landing area next to the old river delta", "credit": "NASA/JPL-Caltech" }
+    },
+    {
+      "id": "site_utopia",
+      "title": "Ice of Utopia",
+      "kind": "milestone",
+      "hint": "Land in Utopia Planitia",
+      "fact": "Under the ground of Utopia Planitia, the radar of NASA's Mars Reconnaissance Orbiter found a huge layer of water ice. It holds about as much water as Lake Superior, one of the biggest lakes on Earth.",
+      "link": "https://images.nasa.gov/details/PIA21138",
+      "photo": { "nasaId": "PIA21138", "alt": "Map of Utopia Planitia with stripes where radar found ice under the ground", "credit": "NASA/JPL-Caltech" }
+    },
+    {
+      "id": "site_hellas",
+      "title": "Hellas Basin",
+      "kind": "milestone",
+      "hint": "Land in Hellas Basin",
+      "fact": "Hellas is one of the biggest impact craters in the solar system. It is so deep that the air at its bottom is the thickest on Mars, and thicker air blocks a little more radiation.",
+      "link": "https://images.nasa.gov/details/PIA02033",
+      "photo": { "nasaId": "PIA02033", "alt": "A colored height map of the huge, round Hellas Basin", "credit": "NASA/JPL/GSFC" }
+    },
+    {
+      "id": "phobos_eclipse",
+      "title": "Moon over the Sun",
+      "kind": "chance",
+      "hint": "Watch the sky",
+      "fact": "In 2022, Perseverance filmed Phobos, one of the two moons of Mars, passing in front of the Sun. Watching these eclipses helps scientists measure how Phobos' orbit slowly changes.",
+      "link": "https://images.nasa.gov/details/PIA25179",
+      "photo": { "nasaId": "PIA25179", "alt": "The lumpy moon Phobos as a dark shape in front of the Sun", "credit": "NASA/JPL-Caltech/ASU/MSSS/SSI" }
+    },
+    {
+      "id": "iron_meteorite",
+      "title": "Space rock",
+      "kind": "chance",
+      "hint": "Check a strange rock",
+      "fact": "In January 2023, Curiosity found an iron-nickel meteorite nicknamed 'Cacao', about 30 centimeters across. It is a rock that fell onto Mars from space.",
+      "link": "https://images.nasa.gov/details/PIA25737",
+      "photo": { "nasaId": "PIA25737", "alt": "A dark, shiny metal rock sitting on pale Martian ground", "credit": "NASA/JPL-Caltech/MSSS" }
+    },
+    {
+      "id": "twilight_clouds",
+      "title": "Shining clouds",
+      "kind": "chance",
+      "hint": "Look up at dusk",
+      "fact": "In January 2025, Curiosity filmed glowing twilight clouds. Some of them are made of frozen carbon dioxide, or dry ice, and float 60 to 80 kilometers above the ground.",
+      "link": "https://images.nasa.gov/details/PIA26519",
+      "photo": { "nasaId": "PIA26519", "alt": "Thin, glowing clouds drifting in the evening sky of Mars", "credit": "NASA/JPL-Caltech/MSSS" }
+    },
+    {
+      "id": "lab_7",
+      "title": "Space wheat",
+      "kind": "lab",
+      "hint": "Power the lab",
+      "factId": "osd622_dwarf_wheat",
+      "photo": { "nasaId": "0300227", "alt": "Dwarf wheat plants growing on the Space Station in 2002", "credit": "NASA" }
+    },
+    {
+      "id": "lab_8",
+      "title": "Brains in orbit",
+      "kind": "lab",
+      "hint": "Power the lab",
+      "factId": "osd536_mouse_brain",
+      "photo": { "nasaId": "iss043e286992", "alt": "Equipment on the Space Station for checking the bones of mice in the Rodent Research 2 study", "credit": "NASA" }
+    },
+    {
+      "id": "lab_9",
+      "title": "Blood tests in orbit",
+      "kind": "lab",
+      "hint": "Power the lab",
+      "factId": "osd570_inspiration4",
+      "photo": { "nasaId": "iss065e012568", "alt": "The Crew Dragon Resilience glowing as it comes home, seen from the Space Station. Months later the same capsule flew the Inspiration4 crew.", "credit": "NASA" }
+    },
+    {
+      "id": "lab_10",
+      "title": "Space on Earth",
+      "kind": "lab",
+      "hint": "Power the lab",
+      "factId": "osd202_radiation_test",
+      "photo": { "nasaId": "jsc2024e043734", "alt": "Dishes of cells that got fake space radiation at the NASA Space Radiation Laboratory", "credit": "NASA" }
     }
   ]
 }

@@ -105,7 +105,7 @@
     "RED_BADGE_GROUNDS": true,
     "LAB_WORK_PER_SAMPLE": 2,
     "CHANCE_SAMPLES": 1,
-    "SCIENCE_TARGET": 20,
+    "SCIENCE_TARGET": 22,
     "SCIENCE_PER_CARD": {
       "chance": 3,
       "lab": 2,
@@ -200,7 +200,10 @@
       "dawn_frost",
       "dust_devil",
       "blue_sunset",
-      "clean_wind"
+      "clean_wind",
+      "phobos_eclipse",
+      "iron_meteorite",
+      "twilight_clouds"
     ],
     "HAZY_CHANCE": 0.4,
     "CLEAR_UNTIL_SOL": 3,
@@ -217,7 +220,9 @@
     "HELPER_ALWAYS_ON": false,
     "SHOW_MSV": true,
     "STORMY_PERIOD_CHANCE": 0.75,
-    "MAX_REAL_EVENTS_PER_SOL": 2
+    "MAX_REAL_EVENTS_PER_SOL": 2,
+    "START_DOSE": 0,
+    "TASKS_PER_MISSION": 2
   },
   "modes": {
     "easy": {
@@ -231,7 +236,7 @@
       "AUTO_FORECAST_SOLS": 1,
       "HELPER_ALWAYS_ON": true,
       "SHOW_MSV": false,
-      "SCIENCE_TARGET": 18
+      "SCIENCE_TARGET": 20
     },
     "medium": {
       "AIR_START": 8,
@@ -247,7 +252,7 @@
       "AIR_START": 6,
       "FOOD_START": 5,
       "ZERO_SOLS_TO_LOSE": 1,
-      "SCIENCE_TARGET": 21,
+      "SCIENCE_TARGET": 23,
       "AIR_LOSS_PER_MISSING_CELL": 2
     }
   },

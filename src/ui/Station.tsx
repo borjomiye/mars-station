@@ -44,7 +44,7 @@ type Props = {
 export type Note = { text: string; icon: string; tone: 'good' | 'bad' | 'plain' };
 
 export function Station({ s, height, selected, onSelect, onJob, overlay, notes }: Props) {
-  const c = cfg(s.mode), day = today(s), st = stormOn(s), { cells, jobs } = layoutOf(s);
+  const c = cfg(s), day = today(s), st = stormOn(s), { cells, jobs } = layoutOf(s);
   const dusty = day.weather === 'dust' || s.problems.some((p) => p.type === 'dusty_panels');
   const top = height - (board.board.h + BOTTOM) * K;           // station board top in px
   const X = (u: number) => (u + GUTTER) * K, Y = (u: number) => top + u * K;

@@ -1,8 +1,8 @@
 // Full-screen moments of a sol: title, event, evening call, mission report, plus album and data windows.
 import {
   badgeOf, cards, cellsAvailable, cfg, crewById, currentEvent, donki, doseComparison, doseFor, effectiveCells, endMission, eventChoices, fmt, fmt2, getPeriod,
-  MODES, messageOptions, planTotal, plural, problemNeed, stormOn, workPower,
-  type CardKind, type GameState, type Mode, type RadioMessageId, type RealEvent,
+  MODES, messageOptions, missionSetup, normSeed, planTotal, plural, problemNeed, siteDef, stormOn, taskDef, taskText, twistDef, workPower,
+  type CardDef, type CardKind, type GameState, type Mode, type RadioMessageId, type RealEvent,
 } from '../engine';
 import { useState } from 'react';
 import { cardPhoto, crewArt, eventScene, icon, robotArt, scene } from './art';
@@ -21,6 +21,8 @@ type TitleProps = {
 };
 export function TitleScreen(p: TitleProps) {
   const [help, setHelp] = useState(false);
+  // the mission name picks the landing site and the twist: show them as the player types
+  const setup = missionSetup(normSeed(p.name || 'Brave Otter')), site = siteDef(setup.siteId), tw = twistDef(setup.twistId);
   return (
     <div className="screen title">
       <img className="screen-bg" src={scene('scene-station')} alt="The station on Mars: two modules and a glass greenhouse dome" />
@@ -60,6 +62,10 @@ export function TitleScreen(p: TitleProps) {
               <svg viewBox="0 0 13 13" shapeRendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M2 1h9v1H2zM1 2h1v9H1zM11 2h1v9h-1zM2 11h9v1H2zM3 3h2v2H3zM8 3h2v2H8zM5 5h3v3H5zM3 8h2v2H3zM8 8h2v2H8z" /></svg>
             </button>
           </div>
+          <p className="title-mission" aria-live="polite">
+            <span title={`${site.plus}. ${site.minus}.`}>Lands in <b>{site.name}</b></span>
+            <span title={`${tw.plus}. ${tw.minus}.`}>Twist: <b>{tw.name}</b></span>
+          </p>
         </div>
 
         <div className="title-step">
@@ -93,9 +99,11 @@ export function TitleScreen(p: TitleProps) {
               <button className="secondary small" data-sfx="close" onClick={() => setHelp(false)} aria-label="Close" autoFocus>X</button>
             </div>
             <ol className="overlay-body htp-steps">
-              <li><span className="step-num">1</span>[Placeholder] Read the morning report for the sol.</li>
-              <li><span className="step-num">2</span>[Placeholder] Make your decisions for the station.</li>
-              <li><span className="step-num">3</span>[Placeholder] Keep all five safe until sol 15.</li>
+              <li><span className="step-num">1</span>Every morning, read the space weather and what Mission Control asks.</li>
+              <li><span className="step-num">2</span>Share the solar power cells and give the crew jobs. There are never enough cells for everything.</li>
+              <li><span className="step-num">3</span>Pick how to handle trouble and chances. Every choice has a price.</li>
+              <li><span className="step-num">4</span>Keep air, water and food up until the ship lands on sol 15. Send science home for more stars.</li>
+              <li><span className="step-num">5</span>A new mission name means a new landing site, a new twist and new tasks.</li>
             </ol>
           </div>
         </div>
@@ -112,7 +120,7 @@ type EventProps = {
   onChange: () => void; onBack: () => void; onPlay: () => void;
 };
 export function EventScreen({ s, picking, onChoose, onTogglePick, onPickConfirm, onPickCancel, onChange, onBack, onPlay }: EventProps) {
-  const c = cfg(s.mode), ev = currentEvent(s), list = eventChoices(s), ch = s.today.choice, st = stormOn(s);
+  const c = cfg(s), ev = currentEvent(s), list = eventChoices(s), ch = s.today.choice, st = stormOn(s);
   // the event announces itself: a storm rumbles, trouble beeps, a chance sparkles
   useScreenSounds(() => (ev ? [[150, ev.id === 'solar_storm' ? sfx.storm : ev.kind === 'trouble' ? sfx.alarm : sfx.chance]] : []), [ev?.id, s.sol]);
   if (!ev) return null;
@@ -248,7 +256,7 @@ export function ReportScreen({ s, album, onAgain, onNew }: { s: GameState; album
   ], [s.name, s.sol]);
   const weight = (e: RealEvent) => (e.type === 'SEP' ? 0 : e.label.startsWith('Solar flare X') ? 1 : e.note.includes('heading for Mars') && !e.note.includes('not') ? 2 : 3);
   const top = r.real.slice().sort((a, b) => weight(a) - weight(b) || a.sol - b.sol).slice(0, 2).sort((a, b) => a.sol - b.sol);
-  const c = cfg(s.mode), iss = doseComparison.iss.perDayMSv, issDay = (iss.min + iss.max) / 2;
+  const c = cfg(s), iss = doseComparison.iss.perDayMSv, issDay = (iss.min + iss.max) / 2;
   const avgDose = r.doses.reduce((a, d) => a + d.dose, 0) / Math.max(1, r.doses.length);
   const issDays = Math.max(1, Math.round(avgDose / issDay));
   // one thing to try next time: the first star that was missed, or a harder mode
@@ -272,6 +280,9 @@ export function ReportScreen({ s, album, onAgain, onNew }: { s: GameState; album
           </ul>
           <p className="try-next"><img src={icon('tip')} alt="" /><span><b>Try next:</b> {tryNext}</span></p>
           <p className="report-science"><img src={icon('science')} alt="" />Science sent home: <b>{r.science} / {r.target}</b> · album {album.length}/{cards.length}</p>
+          {s.tasks.length > 0 && (
+            <p className="report-science"><img src={icon('radio')} alt="" />Mission Control tasks done: <b>{s.tasks.filter((x) => x.status === 'done').length} / {s.tasks.length}</b> · landed in {siteDef(s.siteId).name}</p>
+          )}
           {top.length > 0 && (
             <>
               <h3>Real NASA events in your mission</h3>
@@ -314,32 +325,76 @@ const KIND_NAME: Record<CardKind, string> = { chance: 'Mars find', lab: 'Lab fin
 const KIND_ICON: Record<CardKind, string> = { chance: 'rock-sample', lab: 'science', milestone: 'star' };
 
 /** Found cards show their real NASA photo; a click opens the photo with its fact and sources. */
+/** One card: the real NASA photo, the fact and its sources. Used by the album and by the "new card" pop-up. */
+export function CardDetail({ card, onBack, backLabel }: { card: CardDef; onBack: () => void; backLabel: string }) {
+  const photoLink = `https://images.nasa.gov/details/${card.photo.nasaId}`;
+  const sameSource = card.link === photoLink;
+  return (
+    <div className="album-detail">
+      <img className="album-photo" src={cardPhoto(card.id)} alt={card.photo.alt} />
+      <div className="album-text">
+        <span className="muted">{KIND_NAME[card.kind]}</span>
+        <h3>{card.title}</h3>
+        <p>{card.fact}</p>
+        {sameSource ? (
+          <p className="muted album-source">Photo and fact: {card.photo.credit} · <a href={photoLink} target="_blank" rel="noreferrer">NASA Image Library</a></p>
+        ) : (
+          <>
+            <p className="muted album-source">Fact: <a href={card.link} target="_blank" rel="noreferrer">{card.source}</a></p>
+            <p className="muted album-source">Photo: {card.photo.credit} · <a href={photoLink} target="_blank" rel="noreferrer">NASA Image Library</a></p>
+          </>
+        )}
+        <button className="secondary" onClick={onBack}>{backLabel}</button>
+      </div>
+    </div>
+  );
+}
+
+/** A small banner when a card is found, with a button to look at it right away. */
+export function CardToast({ id, more, onLook, onClose }: { id: string; more: number; onLook: () => void; onClose: () => void }) {
+  const card = cards.find((k) => k.id === id);
+  if (!card) return null;
+  return (
+    <div className="card-toast" role="status" key={id}>
+      <img className="card-toast-thumb" src={cardPhoto(card.id)} alt="" />
+      <div className="card-toast-text">
+        <span>New card{more > 0 ? ` (+${more} more)` : ''}!</span>
+        <b>{card.title}</b>
+      </div>
+      <button className="small" data-sfx="open" onClick={onLook}>Look</button>
+      <button className="secondary small" data-sfx="close" onClick={onClose} aria-label="Later">✕</button>
+    </div>
+  );
+}
+
+/** Mission Control requests for this mission and how they stand. */
+export function TasksView({ s }: { s: GameState }) {
+  const mark = { open: '…', done: '✓', failed: '✕' } as const;
+  return (
+    <div className="tasks-view">
+      <p className="muted">Mission Control sends extra jobs. Each one done adds science, but it may pull power and people away from other work.</p>
+      <ul>
+        {s.tasks.map((x) => {
+          const d = taskDef(x.id);
+          return (
+            <li key={x.id} className={`task ${x.status}`}>
+              <span className="task-mark" aria-hidden="true">{mark[x.status]}</span>
+              <span>{taskText(d)}</span>
+              <b>{x.status === 'done' ? `+${d.reward} science` : x.status === 'failed' ? 'missed' : `+${d.reward} science`}</b>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="muted">Landed in <b>{siteDef(s.siteId).name}</b>: {siteDef(s.siteId).plus}. {siteDef(s.siteId).minus}.</p>
+      <p className="muted">Twist: <b>{twistDef(s.twistId).name}</b>: {twistDef(s.twistId).plus}. {twistDef(s.twistId).minus}.</p>
+    </div>
+  );
+}
+
 export function AlbumView({ album }: { album: string[] }) {
   const [open, setOpen] = useState<string | null>(null);
   const card = open ? cards.find((k) => k.id === open) : undefined;
-  if (card) {
-    const photoLink = `https://images.nasa.gov/details/${card.photo.nasaId}`;
-    const sameSource = card.link === photoLink;
-    return (
-      <div className="album-detail">
-        <img className="album-photo" src={cardPhoto(card.id)} alt={card.photo.alt} />
-        <div className="album-text">
-          <span className="muted">{KIND_NAME[card.kind]}</span>
-          <h3>{card.title}</h3>
-          <p>{card.fact}</p>
-          {sameSource ? (
-            <p className="muted album-source">Photo and fact: {card.photo.credit} · <a href={photoLink} target="_blank" rel="noreferrer">NASA Image Library</a></p>
-          ) : (
-            <>
-              <p className="muted album-source">Fact: <a href={card.link} target="_blank" rel="noreferrer">{card.source}</a></p>
-              <p className="muted album-source">Photo: {card.photo.credit} · <a href={photoLink} target="_blank" rel="noreferrer">NASA Image Library</a></p>
-            </>
-          )}
-          <button className="secondary" onClick={() => setOpen(null)}>◀ Back to album</button>
-        </div>
-      </div>
-    );
-  }
+  if (card) return <CardDetail card={card} onBack={() => setOpen(null)} backLabel="◀ Back to album" />;
   return (
     <div className="album-grid">
       {cards.map((k) => {

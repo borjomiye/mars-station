@@ -69,6 +69,17 @@ export type DoseComparison = {
 export type Fact = { id: string; osd: string; study: string; text: string; link: string };
 export type CrewDef = { id: string; name: string; role: Role };
 
+/** Changes to the balance numbers for one mission: `add` to a number or `set` a value; dotted paths reach inside objects. */
+export type BalancePatch = { add?: Record<string, number>; set?: Record<string, number | boolean> };
+/** A landing site (src/data/sites.json). The mission name picks it. */
+export type SiteDef = { id: string; name: string; where: string; plus: string; minus: string; card: string; patch: BalancePatch };
+/** A mission twist (src/data/twists.json): one gain with one price. */
+export type TwistDef = { id: string; name: string; plus: string; minus: string; patch: BalancePatch };
+export type TaskCheck = 'harvest' | 'samples' | 'cards' | 'report' | 'forecast' | 'airAbove' | 'noMedbay' | 'greenBadges';
+/** A request from Mission Control (src/data/tasks.json). */
+export type TaskDef = { id: string; check: TaskCheck; need: number; by: number; reward: number; text: string };
+export type TaskState = { id: string; status: 'open' | 'done' | 'failed'; sol: number | null };
+
 // ---------- Game state ----------
 
 /** A real DONKI record shown to the player, with its date and source link. */
@@ -123,6 +134,9 @@ export type GameState = {
   name: string;            // "Brave Otter": shown to the player
   seed: string;            // normalised name; same seed = same Mars
   mode: Mode;
+  siteId: string;          // landing site, picked by the mission name
+  twistId: string;         // mission twist, picked by the mission name
+  tasks: TaskState[];      // Mission Control requests for this mission
   periodId: string;        // real DONKI period this mission lives through
   sol: number;
   phase: Phase;
@@ -150,7 +164,7 @@ export type GameState = {
   log: SolRecord[];
   seenWords: string[];
   flags: { panelsCovered: boolean; prefill: string | null };
-  counters: { airZero: number; foodZero: number; harvests: number; medbaySols: number };
+  counters: { airZero: number; foodZero: number; harvests: number; medbaySols: number; samples: number; airLow: number };
   over: { won: boolean; why: 'ship' | 'air' | 'food' } | null;
 };
 

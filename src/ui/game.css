@@ -543,3 +543,27 @@ button.pick:hover .pick-tip, button.pick:focus-visible .pick-tip { display: bloc
 .sound-btn { display: grid; place-items: center; }
 .sound-btn svg, .corner-btn svg { display: block; }
 .sound-btn[aria-pressed="false"], .corner-btn[aria-pressed="false"] { opacity: 0.65; }
+
+/* ---------- mission twists, tasks and the "new card" banner ---------- */
+.title-mission { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; font-size: 20px; line-height: 1.1; color: var(--muted); }
+.title-mission b { color: var(--energy); }
+.tasks-btn { white-space: nowrap; }
+.tasks-view { display: grid; gap: 10px; }
+.tasks-view p { margin: 0; font-size: 20px; }
+.tasks-view ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.task { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; padding: 8px 12px; background: var(--panel-2); border-radius: var(--radius); box-shadow: 0 0 0 2px var(--outline); font-size: 22px; line-height: 1.1; }
+.task b { font-size: 19px; color: var(--science); }
+.task.done { box-shadow: 0 0 0 3px var(--food); }
+.task.done .task-mark { color: var(--food); }
+.task.failed { opacity: 0.6; }
+.task.failed b, .task.failed .task-mark { color: var(--danger); }
+.task-mark { font: 400 16px var(--font-pixel); text-align: center; }
+.card-toast {
+  position: absolute; top: 78px; left: 50%; translate: -50% 0; z-index: 45; display: flex; align-items: center; gap: 12px;
+  padding: 8px 10px 8px 8px; background: var(--chip-bg); border-radius: var(--radius); box-shadow: 0 0 0 3px var(--energy), 6px 6px 0 3px var(--outline);
+}
+.card-toast button { margin-bottom: 0; }
+.card-toast-thumb { width: 84px; height: 60px; object-fit: cover; border-radius: 4px; }
+.card-toast-text { display: grid; line-height: 1.05; min-width: 150px; }
+.card-toast-text span { font: 400 11px var(--font-pixel); color: var(--energy); text-transform: uppercase; }
+.card-toast-text b { font-size: 26px; }

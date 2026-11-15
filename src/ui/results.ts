@@ -7,7 +7,7 @@ import { PROBLEM_ROOM, type Note } from './Station';
 type Notes = Partial<Record<RoomId | 'outside', Note[]>>;
 
 export function resultNotes(prev: GameState | null, s: GameState): Notes {
-  const c = cfg(s.mode), out: Notes = {}, last = s.log[s.log.length - 1], b = s.today.before;
+  const c = cfg(s), out: Notes = {}, last = s.log[s.log.length - 1], b = s.today.before;
   const add = (room: RoomId | 'outside', n: Note) => { (out[room] ??= []).push(n); };
   if (!last || last.sol !== s.sol || !b) return out;
 
