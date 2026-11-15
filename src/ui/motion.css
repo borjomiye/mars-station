@@ -1,0 +1,110 @@
+/* Motion layer: screen transitions, feedback on numbers and cells, event drama. Owner: P6.
+   Kept apart from game.css so art and motion can change separately. Everything here is
+   decoration: with "reduce motion" switched on in the OS, none of it runs.
+   Pixel-art rule: short, snappy moves; steps() for flicker, ease-out for entrances. */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* ---------- screens ---------- */
+  /* every screen fades and settles in when it appears (title, morning, sol, event, radio, report) */
+  .screen { animation: screen-in 0.38s ease-out both; }
+  .screen .screen { animation-duration: 0.3s; }
+  @keyframes screen-in { from { opacity: 0; transform: scale(1.015); } }
+
+  /* the night passes: each morning starts dark and the sky lights up */
+  .screen.brief { animation: dawn 1.1s ease-out both; }
+  @keyframes dawn { from { filter: brightness(0.15) saturate(0.4); } 60% { filter: brightness(0.9) saturate(1); } }
+
+  /* windows (album, data, "why?") rise from the bottom */
+  .overlay { animation: fade-in 0.2s ease-out both; }
+  .overlay-box { animation: rise-in 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+  @keyframes fade-in { from { opacity: 0; } }
+  @keyframes rise-in { from { opacity: 0; transform: translateY(24px) scale(0.97); } }
+
+  /* ---------- title ---------- */
+  .title .screen-bg { animation: drift 24s ease-in-out infinite alternate; }
+  @keyframes drift { from { transform: scale(1.04) translateX(-1%); } to { transform: scale(1.04) translateX(1%); } }
+  .title-panel { animation: slide-right 0.5s 0.1s cubic-bezier(0.2, 0.9, 0.3, 1.1) both; }
+  .title-robot { animation: robot-hop 0.6s 0.35s ease-out both, robot-float 3.2s 1s ease-in-out infinite; }
+  @keyframes slide-right { from { opacity: 0; transform: translateX(-40px); } }
+  @keyframes robot-hop { from { opacity: 0; translate: 0 60px; } 70% { translate: 0 -8px; } }
+  @keyframes robot-float { 50% { translate: 0 -6px; } }
+
+  /* ---------- buttons ---------- */
+  button { transition: transform 0.08s, filter 0.12s, box-shadow 0.08s; }
+  button:hover:not(:active):not(:disabled) { transform: translateY(-2px); }
+  .choice:not(:disabled):hover { filter: brightness(1.12); }
+
+  /* ---------- top bar: numbers react when they change ---------- */
+  .hud-meter-label b.tick { display: inline-block; animation: tick 0.6s ease-out both; }
+  .hud-meter-label b.tick.up { animation-name: tick-up; }
+  .hud-meter-label b.tick.down { animation-name: tick-down; }
+  @keyframes tick-up { 0% { transform: scale(1.5); color: var(--food); } 100% { transform: scale(1); } }
+  @keyframes tick-down { 0%, 40% { transform: translateX(-3px); color: var(--danger); } 20%, 60% { transform: translateX(3px); color: var(--danger); } 100% { transform: none; } }
+  .hud .bar > div { transition: width 0.6s cubic-bezier(0.3, 0.9, 0.4, 1.1); }
+  .hud .flag.alert { animation: flag-pulse 1.2s steps(2) infinite; }
+  @keyframes flag-pulse { 50% { filter: brightness(1.5); } }
+
+  /* ---------- plan: energy cells snap into place ---------- */
+  .sys-cells img.on { animation: cell-in 0.28s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+  @keyframes cell-in { from { transform: translateY(-10px) scale(0.4); opacity: 0; } }
+  .sys.short { animation: short-blink 1.4s steps(2) infinite; }
+  @keyframes short-blink { 50% { box-shadow: 0 0 0 3px var(--outline); } }
+
+  /* ---------- events ---------- */
+  .event-head { animation: drop-in 0.45s 0.1s cubic-bezier(0.2, 1.1, 0.3, 1.1) both; }
+  .event-head.trouble { animation: drop-in 0.45s 0.1s cubic-bezier(0.2, 1.1, 0.3, 1.1) both, alarm-shake 0.4s 0.55s both; }
+  .event-head.trouble > img, .event-head.chance > img { animation: icon-pulse 1s 0.6s steps(2) infinite; }
+  @keyframes drop-in { from { opacity: 0; transform: translateY(-40px); } }
+  @keyframes alarm-shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+  @keyframes icon-pulse { 50% { transform: scale(1.15); } }
+
+  /* choices arrive one after another */
+  .choice-row > * { animation: card-up 0.35s cubic-bezier(0.2, 1, 0.3, 1.1) both; }
+  .choice-row > :nth-child(1) { animation-delay: 0.35s; }
+  .choice-row > :nth-child(2) { animation-delay: 0.45s; }
+  .choice-row > :nth-child(3) { animation-delay: 0.55s; }
+  .choice-row > :nth-child(4) { animation-delay: 0.65s; }
+  @keyframes card-up { from { opacity: 0; transform: translateY(18px); } }
+
+  /* solar storm: the screen pulses red, like the alarm light */
+  .screen.ev-solar_storm::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+    background: radial-gradient(ellipse at center, transparent 40%, var(--storm-tint) 100%), var(--storm-tint);
+    animation: storm-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes storm-pulse { 50% { opacity: 0.25; } }
+
+  /* dust storm: grains blow across the scene */
+  .screen.ev-dust_storm::after {
+    content: ''; position: absolute; inset: -20%; pointer-events: none; z-index: 1; opacity: 0.55;
+    background-image:
+      radial-gradient(circle, var(--mars) 1.5px, transparent 2px),
+      radial-gradient(circle, var(--brief-ground-top) 1px, transparent 1.5px);
+    background-size: 46px 38px, 29px 23px;
+    animation: dust-blow 1.8s linear infinite;
+  }
+  @keyframes dust-blow { to { transform: translate(-46px, 12px); } }
+  /* event-head and event-panel are absolutely positioned in game.css; keep them above the overlay */
+  .screen.ev-solar_storm .event-head, .screen.ev-solar_storm .event-panel,
+  .screen.ev-dust_storm .event-head, .screen.ev-dust_storm .event-panel { z-index: 2; }
+
+  /* ---------- results ---------- */
+  .result-tile { animation: card-up 0.35s cubic-bezier(0.2, 1, 0.3, 1.1) both; }
+  .result-tile:nth-child(2) { animation-delay: 0.1s; }
+  .result-tile:nth-child(3) { animation-delay: 0.2s; }
+  .result-tile.up b, .result-tile.down b { display: inline-block; animation: tile-flash 0.7s 0.4s ease-out both; }
+  .result-tile.up b { --flash: var(--food); }
+  .result-tile.down b { --flash: var(--danger); }
+  @keyframes tile-flash { 0% { transform: scale(1.4); color: var(--flash); } }
+  .results-title { animation: drop-in 0.4s ease-out both; }
+
+  /* ---------- radio ---------- */
+  .radio-panel { animation: rise-in 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.1) both; }
+  .choice[data-sfx='radio']:active:not(:disabled) { animation: send-blip 0.3s steps(3); }
+  @keyframes send-blip { 50% { filter: brightness(1.6); } }
+
+  /* ---------- report ---------- */
+  .report-head { animation: drop-in 0.5s ease-out both; }
+  .report-col { animation: card-up 0.45s 0.25s ease-out both; }
+  .report-col + .report-col { animation-delay: 0.4s; }
+}

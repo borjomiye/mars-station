@@ -88,7 +88,8 @@ export function PlanBase({ s, onCells, onJob, onDone }: PlanProps) {
                   <div className="sys-row">
                     <button className="small secondary" data-sfx="none" aria-label={`Less power for ${d.name}`} disabled={n <= 0} onClick={() => { sfx.cell(n - 1, false); onCells(k, -1); }}>−</button>
                     <span className="sys-cells" aria-label={`${n} of ${d.want} cells`}>
-                      {Array.from({ length: d.max }, (_, i) => <img key={i} src={icon(i < n ? 'cell' : 'cell-empty')} className={i >= d.want ? 'bonus' : ''} alt="" />)}
+                      {/* the key changes when a cell fills, so the new cell plays its "snap in" animation (motion.css) */}
+                      {Array.from({ length: d.max }, (_, i) => <img key={`${i}-${i < n}`} src={icon(i < n ? 'cell' : 'cell-empty')} className={`${i >= d.want ? 'bonus' : ''}${i < n ? ' on' : ''}`} alt="" />)}
                     </span>
                     <button className="small" data-sfx="none" aria-label={`More power for ${d.name}`} disabled={black || n >= d.max || free <= 0} onClick={() => { sfx.cell(n + 1, true); onCells(k, 1); }}>+</button>
                   </div>
