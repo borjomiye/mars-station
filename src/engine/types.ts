@@ -59,6 +59,12 @@ export type ChanceDef = { title: string; line: string; card: string | null };
 export type CardPhoto = { nasaId: string; alt: string; credit: string };
 /** Album card. fact/source/link are resolved in content.ts (from the card itself or from facts.json). */
 export type CardDef = { id: string; title: string; kind: CardKind; hint: string; fact: string; source: string; link: string; photo: CardPhoto };
+/** ISS vs Mars dose per day in mSv, each with its NASA source (src/data/radlab-iss.json). */
+export type DoseComparison = {
+  stub: boolean;
+  iss: { sixMonthsSolarMaxMSv: number; sixMonthsSolarMinMSv: number; perDayMSv: { min: number; max: number }; source: string; link: string };
+  mars: { perDayMSv: number; period: string; source: string; link: string };
+};
 /** A space biology fact from NASA OSDR (src/data/facts.json). */
 export type Fact = { id: string; osd: string; study: string; text: string; link: string };
 export type CrewDef = { id: string; name: string; role: Role };

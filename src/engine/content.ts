@@ -1,9 +1,10 @@
 // Typed access to the JSON data files. Engine code reads data only through here.
-import type { CardDef, CardKind, ChanceDef, Fact, CrewDef, DonkiEvent, DonkiFile, DonkiPeriod, Mode, ProblemDef, Role, SystemDef, SystemId, TroubleDef, Weather } from './types';
+import type { CardDef, CardKind, ChanceDef, DoseComparison, Fact, CrewDef, DonkiEvent, DonkiFile, DonkiPeriod, Mode, ProblemDef, Role, SystemDef, SystemId, TroubleDef, Weather } from './types';
 import balanceJson from '../data/balance.json';
 import eventsJson from '../data/events.json';
 import cardsJson from '../data/cards.json';
 import factsJson from '../data/facts.json';
+import doseJson from '../data/radlab-iss.json';
 import textJson from '../data/en.json';
 import donkiJson from '../data/donki-periods.json';
 
@@ -34,6 +35,7 @@ export const botBalance = balanceJson.bot;
 export const troubles = eventsJson.troubles as Record<string, TroubleDef>;
 export const chances = eventsJson.chances as Record<string, ChanceDef>;
 export const facts = factsJson.facts as Fact[];
+export const doseComparison = doseJson as DoseComparison;
 type RawCard = Omit<CardDef, 'fact' | 'source' | 'link'> & { fact?: string; link?: string; factId?: string };
 /** A card's fact is either its own (from the photo's NASA caption) or an OSDR fact from facts.json. */
 function resolveCard(c: RawCard): CardDef {

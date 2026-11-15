@@ -1,7 +1,7 @@
 {
   "_note": "All game numbers. Tune with `npm run simulate` and playtests. `base` = numbers shared by all modes (the schedule uses only these); `modes` = Easy / Medium / Hard overrides; `bot` = mistake chances of the sloppy test bot. Owner: P5 (game design).",
   "_sources": {
-    "DOSE_INDOOR_PER_SOL": "Curiosity RAD, Hassler et al., Science 2014 (doi:10.1126/science.1244797): about 0.64-0.67 mSv/day on the surface. VERIFY before demo.",
+    "DOSE_INDOOR_PER_SOL": "Curiosity RAD: an average of 0.67 mSv per day on the surface, August 2012 to June 2013 (NASA news release 9 Dec 2013; Hassler et al., Science 343, 2014, doi:10.1126/science.1244797). Verified 2026-11-15, see src/data/radlab-iss.json.",
     "STORM_MULT_BY_DAY": "Curiosity saw a 2-3x rise for about two days in Sept 2017 (NASA/JPL). Game value.",
     "BADGE_AMBER_MSV": "Game thresholds, not NASA limits. Say so on the data screen."
   },
