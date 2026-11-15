@@ -38,6 +38,6 @@ The engine in `src/engine/` now runs the mechanics from the greybox prototype (s
 - **Stars, Captain's report, "Same Mars again"**, mission names as seeds, the discovery album.
 - No dice: the same mission name and the same choices always give the same result.
 
-All numbers are in `src/data/balance.json` (`base` = Commander, `modes` = overrides). `npm run simulate -- 300` plays three bots (careful, sloppy, lazy) and fails if the balance guard rails break.
+All numbers are in `src/data/balance.json` (`base` = numbers shared by every mode, `modes` = Easy / Medium / Hard overrides; all modes play the same Mars for the same mission name). `npm run simulate -- 300` plays three bots (careful, sloppy, lazy) in each mode and fails if the balance guard rails break, including when a harder mode stops being harder.
 
 Texts: every sentence of the engine and the helper is a key in `src/data/en.json` (`text`), used through `t(key, params)`. Still open: button labels and headings in `src/ui/*.tsx` are plain strings; album cards have titles only (no NASA photos or facts); the screens are plain React without the pixel art; `sites.json`, `facts.json` and `radlab-iss.json` are not used by the new engine.

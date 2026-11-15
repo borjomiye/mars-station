@@ -1,7 +1,9 @@
 // THE CONTRACT. Every other part of the game (UI, data, scripts, tests) builds on these types.
 // Rewritten for the greybox mechanics (5 systems, crew jobs, dose badges, problems, radio, album).
 
-export type Mode = 'cadet' | 'commander';
+export type Mode = 'easy' | 'medium' | 'hard';
+/** Difficulty levels, easiest first. All of them play the same Mars for the same mission name. */
+export const MODES: Mode[] = ['easy', 'medium', 'hard'];
 export type SystemId = 'life' | 'shield' | 'greenhouse' | 'radio' | 'lab';
 export const SYSTEMS: SystemId[] = ['life', 'shield', 'greenhouse', 'radio', 'lab'];
 export type Job = 'grow' | 'fix' | 'outside' | 'lab' | 'care' | 'rest';

@@ -19,13 +19,14 @@ export type Balance = Omit<Base, 'SYSTEMS' | 'PROBLEMS' | 'SPECIALIST_OF' | 'JOB
 };
 
 const merged: Record<Mode, Balance> = {
-  cadet: { ...balanceJson.base, ...balanceJson.modes.cadet } as unknown as Balance,
-  commander: { ...balanceJson.base, ...balanceJson.modes.commander } as unknown as Balance,
+  easy: { ...balanceJson.base, ...balanceJson.modes.easy } as unknown as Balance,
+  medium: { ...balanceJson.base, ...balanceJson.modes.medium } as unknown as Balance,
+  hard: { ...balanceJson.base, ...balanceJson.modes.hard } as unknown as Balance,
 };
 export function cfg(mode: Mode): Balance {
   return merged[mode];
 }
-/** Mode-independent numbers (the schedule must be the same Mars in both modes). */
+/** Mode-independent numbers (the schedule must be the same Mars in every mode). */
 export const baseBalance = balanceJson.base as unknown as Balance;
 export const botBalance = balanceJson.bot;
 

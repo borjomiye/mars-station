@@ -4,7 +4,7 @@
 //  - lazy:    powers nothing useful, everyone rests (must lose)
 import {
   applyPlan, backToPlan, botBalance, cellsAvailable, cfg, confirmPlan, createMission, currentEvent, endMission, eventChoices, hashString, isBlackout, isUnlocked,
-  messageOptions, mulberry32, playSol, proceed, radioBlocked, resolveEvent, sendMessage, startPlanning, today, workPower,
+  MODES, messageOptions, mulberry32, playSol, proceed, radioBlocked, resolveEvent, sendMessage, startPlanning, today, workPower,
   type BotStyle, type GameState, type Job, type Mode, type Plan, type RadioMessageId, type SystemId,
 } from '../src/engine';
 
@@ -119,7 +119,7 @@ export type BalanceRow = {
 /** How many missions end with 0/1/2/3 stars, per bot and mode. */
 export function balanceReport(n = 40, styles: BotStyle[] = ['careful', 'sloppy', 'lazy']): Record<string, BalanceRow> {
   const out: Record<string, BalanceRow> = {}, round = (v: number) => Math.round(v * 100) / 100;
-  for (const style of styles) for (const mode of ['cadet', 'commander'] as Mode[]) {
+  for (const style of styles) for (const mode of MODES) {
     const a: BalanceRow = { missions: n, stars: [0, 0, 0, 0], reachedShip: 0, avgScience: 0, avgMinAir: 0, avgMinFood: 0, avgMaxDose: 0, avgMedbaySols: 0 };
     for (let i = 0; i < n; i++) {
       let minAir = 99, minFood = 99;

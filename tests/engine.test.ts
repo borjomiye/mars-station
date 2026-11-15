@@ -1,19 +1,19 @@
 // Engine rules, determinism, win/lose and a full simulated mission per mode.
 import { describe, expect, it } from 'vitest';
 import {
-  addProblem, applyPlan, cardDef, cards, cfg, cellsAvailable, createMission, crewById, donki, endMission, enterMedbay, eventChoices, go, jobAllowed,
+  MODES, addProblem, applyPlan, cardDef, cards, cfg, cellsAvailable, createMission, crewById, donki, endMission, enterMedbay, eventChoices, go, jobAllowed,
   planTotal, playSol, proceed, radioCanSend, sendMessage, startPlanning, wordCount,
   type GameState, type Job, type Plan, type SystemId,
 } from '../src/engine';
 import { balanceReport, botStep, runMission } from '../scripts/bots';
 
-const C = cfg('commander');
+const C = cfg('medium');
 const D0 = C.DOSE_INDOOR_PER_SOL;
 const sched = (s: GameState) => s.schedule.map((d) => d.kind[0] + (d.eventId || '-') + d.weather[0] + (d.storm ? 'S' : '')).join(' ');
 
 /** A clean lab mission without events, for single-rule checks. */
 function mk(sol: number, edit?: (s: GameState) => void): GameState {
-  const s = createMission('unit test', 'commander');
+  const s = createMission('unit test', 'medium');
   for (const d of s.schedule) { d.kind = 'quiet'; d.eventId = null; d.storm = null; d.weather = 'clear'; d.real = []; }
   s.sol = sol; s.supply = 10; s.phase = 'plan';
   edit?.(s);
@@ -34,16 +34,16 @@ const dose = (s: GameState, id: string) => crewById(s, id).dose;
 
 describe('same Mars for everyone', () => {
   it('same name + same choices = same result', () => {
-    expect(JSON.stringify(runMission('Brave Otter', 'commander'))).toBe(JSON.stringify(runMission('Brave Otter', 'commander')));
+    expect(JSON.stringify(runMission('Brave Otter', 'hard'))).toBe(JSON.stringify(runMission('Brave Otter', 'hard')));
   });
   it('the seed ignores case and the "Mission" prefix', () => {
-    expect(sched(createMission('mission BRAVE  otter', 'cadet'))).toBe(sched(createMission('Brave Otter', 'cadet')));
+    expect(sched(createMission('mission BRAVE  otter', 'easy'))).toBe(sched(createMission('Brave Otter', 'easy')));
   });
   it('different names give a different Mars', () => {
-    expect(sched(createMission('Brave Otter', 'cadet'))).not.toBe(sched(createMission('Quiet Falcon', 'cadet')));
+    expect(sched(createMission('Brave Otter', 'easy'))).not.toBe(sched(createMission('Quiet Falcon', 'easy')));
   });
-  it('Cadet and Commander share one schedule', () => {
-    expect(sched(createMission('Brave Otter', 'cadet'))).toBe(sched(createMission('Brave Otter', 'commander')));
+  it('every mode plays the same Mars', () => {
+    for (const m of MODES) expect(sched(createMission('Brave Otter', m))).toBe(sched(createMission('Brave Otter', 'easy')));
   });
 });
 
@@ -54,14 +54,14 @@ describe('real NASA data', () => {
   });
   it('every mission shows real DONKI events with their date and link', () => {
     for (let i = 0; i < 30; i++) {
-      const s = createMission('real ' + i, 'cadet'), real = s.schedule.flatMap((d) => d.real);
+      const s = createMission('real ' + i, 'easy'), real = s.schedule.flatMap((d) => d.real);
       expect(real.length).toBeGreaterThan(0);
       for (const e of real) { expect(e.date).toMatch(/^\d{4}-\d{2}-\d{2}$/); expect(e.link).toMatch(/^https:\/\//); }
     }
   });
   it('a solar storm in the game always comes from a real SEP record', () => {
     let storms = 0;
-    for (let i = 0; i < 30; i++) for (const d of createMission('storm ' + i, 'cadet').schedule) if (d.storm) {
+    for (let i = 0; i < 30; i++) for (const d of createMission('storm ' + i, 'easy').schedule) if (d.storm) {
       storms++;
       expect(d.storm.link).toMatch(/SEP/);
       expect(d.eventId).toBe('solar_storm');
@@ -72,7 +72,7 @@ describe('real NASA data', () => {
 
 describe('full missions played by bots', () => {
   it('invariants hold and the morning lines stay short', () => {
-    for (const mode of ['cadet', 'commander'] as const) for (let i = 0; i < 12; i++) {
+    for (const mode of MODES) for (let i = 0; i < 12; i++) {
       const prev: Record<string, number> = {};
       runMission('seed ' + i, mode, i % 2 ? 'careful' : 'sloppy', (t) => {
         const c = cfg(t.mode);
@@ -85,8 +85,8 @@ describe('full missions played by bots', () => {
       });
     }
   });
-  it('a careful player brings the crew home in both modes', () => {
-    for (const mode of ['cadet', 'commander'] as const) for (let i = 0; i < 12; i++) {
+  it('a careful player brings the crew home in every mode', () => {
+    for (const mode of MODES) for (let i = 0; i < 12; i++) {
       const s = runMission('home ' + i, mode);
       expect(s.phase).toBe('report');
       expect(s.sol).toBe(C.MISSION_SOLS);
@@ -94,7 +94,7 @@ describe('full missions played by bots', () => {
     }
   });
   it('neglect ends in an early return, and the report names the decision that mattered', () => {
-    const s = runMission('Brave Otter', 'commander', 'lazy'), r = endMission(s);
+    const s = runMission('Brave Otter', 'hard', 'lazy'), r = endMission(s);
     expect(r.won).toBe(false);
     expect(s.sol).toBeLessThan(C.MISSION_SOLS);
     expect(r.starCount).toBe(0);
@@ -103,11 +103,11 @@ describe('full missions played by bots', () => {
   it('mistakes cost stars: sloppy play never beats careful play on average', () => {
     const b = balanceReport(20, ['careful', 'sloppy']);
     const avg = (k: string) => b[k].stars.reduce((a, n, i) => a + n * i, 0) / b[k].missions;
-    expect(avg('sloppy / commander')).toBeLessThan(avg('careful / commander'));
+    expect(avg('sloppy / medium')).toBeLessThan(avg('careful / medium'));
   });
   it('every event choice has a price', () => {
     for (let i = 0; i < 12; i++) {
-      let s = createMission('price ' + i, 'commander'), guard = 0;
+      let s = createMission('price ' + i, 'hard'), guard = 0;
       while (s.phase !== 'report' && guard++ < 400) {
         if (s.phase === 'event') for (const ch of eventChoices(s)) { expect(ch.minus.length, ch.id).toBeGreaterThan(3); expect(ch.plus.length, ch.id).toBeGreaterThan(3); }
         s = botStep(s, 'careful');
@@ -242,6 +242,6 @@ describe('data and state machine', () => {
     for (const k of cards) { expect(cardDef(k.id).title.length).toBeGreaterThan(2); expect(k.hint.length).toBeGreaterThan(2); }
   });
   it('illegal phase transitions are rejected', () => {
-    expect(() => go(createMission('x', 'cadet'), 'radio')).toThrow();
+    expect(() => go(createMission('x', 'easy'), 'radio')).toThrow();
   });
 });
