@@ -33,7 +33,6 @@ jobs:
     needs: check
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
-    # Only deploys queue against each other; PR checks never cancel a deploy.
     concurrency:
       group: pages-deploy
       cancel-in-progress: false

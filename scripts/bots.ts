@@ -1,7 +1,3 @@
-// Test players. They use only the public engine API, like the UI does.
-//  - careful: plays by the rules without mistakes (upper bound)
-//  - sloppy:  same rules, but makes the mistakes a child makes (see balance.json "bot")
-//  - lazy:    powers nothing useful, everyone rests (must lose)
 import {
   applyPlan, backToPlan, botBalance, cellsAvailable, cfg, confirmPlan, createMission, currentEvent, endMission, eventChoices, hashString, isBlackout, isUnlocked,
   MODES, messageOptions, mulberry32, playSol, proceed, radioBlocked, resolveEvent, sendMessage, startPlanning, today, workPower,
@@ -56,7 +52,7 @@ export function botChoice(s: GameState, style: BotStyle): [string, string[]] {
   const c = cfg(s), ev = currentEvent(s), list = eventChoices(s).filter((x) => x.enabled);
   const lastId = (): [string, string[]] => { const l = list.filter((x) => !x.pick); return [l[l.length - 1].id, []]; };
   if (!ev || style === 'lazy') return lastId();
-  if (style === 'sloppy' && roll(s, 'choice')() < B.skipChoice) return lastId(); // "I'll deal with it later"
+  if (style === 'sloppy' && roll(s, 'choice')() < B.skipChoice) return lastId();
   const has = (id: string) => list.some((x) => x.id === id);
   const fit = s.crew.filter((p) => p.medbay <= 0 && !p.sick && p.cond !== 'tired');
   const fixers = fit.slice().sort((a, b) => workPower(c, b, 'fix') - workPower(c, a, 'fix'));
@@ -81,7 +77,7 @@ export function botChoice(s: GameState, style: BotStyle): [string, string[]] {
 
 export function botMessage(s: GameState, style: BotStyle): RadioMessageId | null {
   if (style === 'lazy') return null;
-  if (style === 'sloppy' && roll(s, 'msg')() < B.skipMessage) return null; // forgot the radio
+  if (style === 'sloppy' && roll(s, 'msg')() < B.skipMessage) return null;
   const c = cfg(s), o = messageOptions(s), en = (id: RadioMessageId) => !!o.find((m) => m.id === id)?.enabled;
   const unsent = s.cards.found.filter((id) => !s.cards.sent.includes(id)).length;
   if (en('science') && (unsent >= 2 || s.sol >= c.MISSION_SOLS - 2)) return 'science';
@@ -90,7 +86,6 @@ export function botMessage(s: GameState, style: BotStyle): RadioMessageId | null
   return 'forecast';
 }
 
-/** One step of the state machine, whatever the phase is. */
 export function botStep(s: GameState, style: BotStyle): GameState {
   if (s.phase === 'briefing') return startPlanning(s);
   if (s.phase === 'plan') return confirmPlan(applyPlan(s, botPlan(s, style)));
@@ -116,7 +111,6 @@ export type BalanceRow = {
   missions: number; stars: [number, number, number, number]; reachedShip: number;
   avgScience: number; avgMinAir: number; avgMinFood: number; avgMaxDose: number; avgMedbaySols: number;
 };
-/** How many missions end with 0/1/2/3 stars, per bot and mode. */
 export function balanceReport(n = 40, styles: BotStyle[] = ['careful', 'sloppy', 'lazy']): Record<string, BalanceRow> {
   const out: Record<string, BalanceRow> = {}, round = (v: number) => Math.round(v * 100) / 100;
   for (const style of styles) for (const mode of MODES) {

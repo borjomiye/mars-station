@@ -1,10 +1,3 @@
-// Deterministic RNG (mulberry32). Owner: P1.
-// Two streams:
-//  - schedule: created from the seed in newGame(); decides site, DONKI period and the event of every sol.
-//  - decisions: its state lives in GameState.decisionRng; used for outcomes that depend on choices.
-// So the same seed gives the whole class the same events, whatever each student decides.
-
-/** One step of the serializable stream: returns [value in 0..1, next state]. */
 export function nextRandom(rngState: number): [number, number] {
   const next = (rngState + 0x6d2b79f5) >>> 0;
   let t = next;
@@ -40,7 +33,6 @@ export function randomSeed(): number {
   return Math.floor(Math.random() * 1_000_000);
 }
 
-/** Mission names are the seed: "Brave Otter" always gives the same Mars. */
 export function hashString(str: string): number {
   let h = 1779033703 ^ str.length;
   for (let i = 0; i < str.length; i++) {

@@ -1,4 +1,3 @@
-// Public API of the engine. UI, scripts and tests import from here.
 export * from './types';
 export {
   createMission, getMorning, startPlanning, applyPlan, confirmPlan, backToPlan, clearChoice, resolveEvent, playSol, previewSol,

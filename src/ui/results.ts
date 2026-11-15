@@ -1,5 +1,3 @@
-// What each room did this sol, worked out by comparing the state before and after the sol (UI only).
-// Shown as notes over the rooms, so a child sees the cause where it happened.
 import { badgeOf, cardDef, cfg, fmt, type GameState } from '../engine';
 import type { RoomId } from './art';
 import { PROBLEM_ROOM, type Note } from './Station';
@@ -11,17 +9,14 @@ export function resultNotes(prev: GameState | null, s: GameState): Notes {
   const add = (room: RoomId | 'outside', n: Note) => { (out[room] ??= []).push(n); };
   if (!last || last.sol !== s.sol || !b) return out;
 
-  // greenhouse: crop growth and harvests
   const steps = s.crop - b.crop + last.harvests * c.CROP_STEPS_TO_HARVEST;
   if (last.harvests > 0) add('greenhouse', { text: `Harvest! Food +${c.HARVEST_FOOD * last.harvests}`, icon: 'food', tone: 'good' });
   if (steps > 0) add('greenhouse', { text: `Crop +${fmt(steps)}`, icon: 'crop', tone: 'good' });
   else if (last.cells.greenhouse === 0) add('greenhouse', { text: 'Crops wait', icon: 'crop', tone: 'bad' });
 
-  // workshop = life support: the air tank
   const air = s.air - b.air;
   if (air !== 0) add('workshop', { text: `Air ${air > 0 ? '+' : '−'}${fmt(Math.abs(air))}`, icon: 'air', tone: air > 0 ? 'good' : 'bad' });
 
-  // repairs: problems that were open before and are gone now
   if (prev) {
     for (const p of prev.problems) {
       if (s.problems.some((q) => q.uid === p.uid)) continue;
@@ -34,16 +29,14 @@ export function resultNotes(prev: GameState | null, s: GameState): Notes {
     }
   }
 
-  // new discovery cards: lab cards in the lab, finds outside
   const found = prev ? s.cards.found.filter((id) => !prev.cards.found.includes(id)) : [];
   for (const id of found) {
     const k = cardDef(id);
-    const again = (s.cards.owned ?? []).includes(id); // already in the album from an earlier mission
+    const again = (s.cards.owned ?? []).includes(id);
     add(k.kind === 'lab' ? 'lab' : k.kind === 'chance' ? 'outside' : 'radio', { text: again ? `Seen again: ${k.title}` : `New card: ${k.title}`, icon: 'card-back', tone: again ? 'plain' : 'good' });
   }
   if (prev && s.samples > prev.samples) add('outside', { text: `Sample +${fmt(s.samples - prev.samples)}`, icon: 'rock-sample', tone: 'good' });
 
-  // people: medbay, tiredness, illness, dose badge
   if (prev) {
     for (const p of s.crew) {
       const was = prev.crew.find((q) => q.id === p.id);

@@ -1,5 +1,4 @@
 {
-  "_note": "Landing sites. The mission name picks one (same name = same site). `patch` changes balance numbers for this mission only: `add` adds to a number, `set` replaces it; dotted paths reach inside objects (CELLS_BY_WEATHER.clear). Every site has a plus and a minus. Facts are on the site's album card (cards.json). Owner: P4 + P5.",
   "sites": [
     {
       "id": "gale",

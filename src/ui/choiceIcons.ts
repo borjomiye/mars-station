@@ -1,5 +1,3 @@
-// A small picture for each "+" and "−" line on choice cards, picked from the words in the line (UI only).
-// Children read the picture first; the text is there for the details.
 const RULES: [RegExp, string][] = [
   [/\bstar\b/i, 'star-empty'],
   [/\bshield\b/i, 'shield'],

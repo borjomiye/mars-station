@@ -1,26 +1,3 @@
-// Downloads real NASA DONKI events (SEP, FLR, CME), picks playable 15-day periods and writes
-// src/data/donki-periods.json. Run once by the data owner (P4); the game never calls the API.
-//
-// Usage:
-//   npm run fetch:donki -- [startDate=2013-01-01] [endDate=2026-10-31] [--dry] [--api-nasa] [--refresh]
-//   --dry       only prints statistics and the chosen periods, does not write the file
-//   --api-nasa  use api.nasa.gov (needs NASA_API_KEY in .env) instead of the CCMC web service
-//   --refresh   ignore the local download cache (node_modules/.cache/donki-*.json)
-//
-// Default source: NASA CCMC DONKI web service (ccmc.gsfc.nasa.gov/DONKI/WS), the origin of the
-// api.nasa.gov DONKI endpoints. No key needed, max 60 days per request.
-// Note (Nov 2026): api.nasa.gov/DONKI/FLR returned 404, so flares always come from CCMC.
-// GST (geomagnetic storms) are skipped on purpose: they are about Earth's magnetic field, Mars has none.
-//
-// How periods are picked (so every period in the file is playable by src/engine/schedule.ts):
-// - A storm day is a day with an OBSERVED solar particle event. SEP entries that only come from a
-//   forecast model (instrument "MODEL: ...") are skipped: the game says "seen from near Earth".
-// - Stormy period: a 15-day window (any start date) with 1..MAX_STORM_DAYS storm days, all of them
-//   on sols STORM_MIN_SOL..STORM_MAX_SOL (numbers read from balance.json). For each storm the
-//   window start is chosen among the valid ones by a hash of the date, so storms land on varied sols.
-// - Calm period: a window with no storm day but at least one M/X flare or fast/Mars CME.
-//   Windows with an X flare or a CME aimed at Mars come first, then they are spread over the years.
-// - Each day keeps at most MAX_EVENTS_PER_DAY events (storm, Mars CME, X flare, CME, M flare).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import balance from '../src/data/balance.json';
 import type { DonkiEvent, DonkiFile, DonkiPeriod } from '../src/engine/types';
@@ -36,16 +13,15 @@ const END = args[1] ?? '2026-10-31';
 const WINDOW_DAYS: number = balance.base.MISSION_SOLS;
 const STORM_MIN_SOL: number = balance.base.STORM_MIN_SOL;
 const STORM_MAX_SOL: number = balance.base.STORM_MAX_SOL;
-const CHUNK_DAYS = 30; // CCMC allows at most 60 days per request
+const CHUNK_DAYS = 30;
 const OUT = 'src/data/donki-periods.json';
 const CACHE_DIR = 'node_modules/.cache';
 const DAY = 86_400_000;
 
-// Filters keep the game readable: one morning line per notable event, not hundreds.
-const MIN_CME_SPEED = 1000; // km/s: fast CMEs, or any CME the ENLIL model sends to Mars
-const STRONG_FLARE = /^[MX]/; // M and X class flares only
-const MAX_STORM_DAYS = Number(process.env.MAX_STORM_DAYS ?? 3); // more storm days per 15 sols is unwinnable
-const MAX_EVENTS_PER_DAY = 3; // the game shows at most MAX_REAL_EVENTS_PER_SOL of them
+const MIN_CME_SPEED = 1000;
+const STRONG_FLARE = /^[MX]/;
+const MAX_STORM_DAYS = Number(process.env.MAX_STORM_DAYS ?? 3);
+const MAX_EVENTS_PER_DAY = 3;
 const MAX_STORMY = Number(process.env.MAX_STORMY ?? 40);
 const MAX_CALM = Number(process.env.MAX_CALM ?? 15);
 
@@ -73,7 +49,6 @@ async function get<T>(type: 'SEP' | 'FLR' | 'CME', start: string, end: string): 
       const text = await res.text();
       return text.trim() ? (JSON.parse(text) as T[]) : [];
     }
-    // 429 also happens with an own key (short burst limit); remaining quota is in X-Ratelimit-Remaining.
     const left = res.headers.get('x-ratelimit-remaining');
     console.warn(`  ${type} ${start}..${end}: HTTP ${res.status} (attempt ${attempt}${left ? `, quota left ${left}` : ''})`);
     if (res.status === 429 && KEY === 'DEMO_KEY') throw new Error('Rate limit hit. Use your own NASA_API_KEY in .env.');
@@ -89,7 +64,6 @@ const isModelOnly = (e: RawSep) => {
 
 function toEvents(sep: RawSep[], flr: RawFlr[], cme: RawCme[]): DonkiEvent[] {
   const out: DonkiEvent[] = [];
-  // DONKI lists one SEP per instrument/threshold; the game needs one storm per day.
   const sepDays = new Set<string>();
   for (const e of sep) {
     if (isModelOnly(e)) continue;
@@ -113,7 +87,6 @@ function toEvents(sep: RawSep[], flr: RawFlr[], cme: RawCme[]): DonkiEvent[] {
   return out;
 }
 
-// Same order as rank() in src/engine/schedule.ts, then by flare class.
 const rank = (e: DonkiEvent): number =>
   e.type === 'SEP' ? 0 : e.marsImpact ? 1 : e.type === 'FLR' && (e.classType ?? '').startsWith('X') ? 2 : e.type === 'CME' ? 3 : 4;
 const flareSize = (e: DonkiEvent) => (e.type === 'FLR' ? Number((e.classType ?? '').slice(1)) || 0 : 0);
@@ -138,7 +111,6 @@ async function download(): Promise<DonkiEvent[]> {
   for (let t = Date.parse(START); t <= Date.parse(END); t += CHUNK_DAYS * DAY) {
     const s = iso(t);
     const e = iso(Math.min(t + (CHUNK_DAYS - 1) * DAY, Date.parse(END)));
-    // Each 30-day chunk is cached too, so a run stopped by a network error resumes where it stopped.
     const chunkFile = `${CACHE_DIR}/donki-chunks/${s}_${e}.json`;
     if (!REFRESH && existsSync(chunkFile)) {
       all.push(...(JSON.parse(readFileSync(chunkFile, 'utf8')) as DonkiEvent[]));
@@ -174,11 +146,9 @@ function pickStormy(all: DonkiEvent[]): DonkiPeriod[] {
     const s = sols(start);
     return s.length >= 1 && s.length <= MAX_STORM_DAYS && s.every((x) => x >= STORM_MIN_SOL && x <= STORM_MAX_SOL);
   };
-  // Candidate starts: every day from which some storm day lands on sol STORM_MIN_SOL..STORM_MAX_SOL.
   const starts = new Set<string>();
   for (const d of stormDays) for (let sol = STORM_MIN_SOL; sol <= STORM_MAX_SOL; sol++) starts.add(addDays(d, 1 - sol));
   const ok = [...starts].filter((s) => s >= START && addDays(s, WINDOW_DAYS - 1) <= END && valid(s)).sort();
-  // Group valid starts that share the same first storm day; pick one start per group, no overlaps.
   const groups = new Map<string, string[]>();
   for (const s of ok) {
     const first = stormDays.find((d) => d >= s)!;
@@ -222,7 +192,6 @@ function pickCalm(all: DonkiEvent[], stormy: DonkiPeriod[]): DonkiPeriod[] {
 
 async function main() {
   const all = await download();
-  // Keep every stormy window with an X flare (e.g. Sept 2017, May 2024), spread the rest over the years.
   const allStormy = pickStormy(all);
   const hasX = (p: DonkiPeriod) => p.events.some((e) => e.type === 'FLR' && (e.classType ?? '').startsWith('X'));
   const xStormy = allStormy.filter(hasX).slice(0, MAX_STORMY);

@@ -1,4 +1,3 @@
-// Pixel art from src/assets (owner: P6). Each folder is one glob so README and previews stay out of the bundle.
 import boardJson from '../assets/station/board.json';
 import type { EffectiveJob, GameState, SystemId } from '../engine';
 
@@ -11,7 +10,6 @@ const robot = pick(import.meta.glob('../assets/robot/*.png', { eager: true, impo
 const scenes = pick(import.meta.glob('../assets/scenes/*.jpg', { eager: true, import: 'default' }));
 const station = pick(import.meta.glob('../assets/station/*.png', { eager: true, import: 'default' }));
 const patch = pick(import.meta.glob('../assets/patch/*.png', { eager: true, import: 'default' }));
-// Real NASA photos for the album cards (P4): src/assets/cards/<card id>.jpg. Only URLs here; a photo loads when the album shows it.
 const cardPhotos = pick(import.meta.glob('../assets/cards/*.jpg', { eager: true, import: 'default' }));
 
 const need = (set: Record<string, string>, name: string): string => {
@@ -27,8 +25,6 @@ export const stationArt = (name: string) => need(station, name);
 export const patchArt = (name: string) => need(patch, name);
 export const cardPhoto = (cardId: string) => need(cardPhotos, cardId);
 
-// ---------- Station board layout (src/assets/station/board.json) ----------
-
 export type RoomId = 'lab' | 'medbay' | 'greenhouse' | 'workshop' | 'radio';
 export type Rect = { x: number; y: number; w: number; h: number };
 type RoomJson = Rect & { name: string; system: SystemId; label: { x: number; y: number }; slots: { x: number; y: number }[] };
@@ -38,7 +34,6 @@ export const board = boardJson as unknown as {
 };
 export const ROOMS: RoomId[] = ['lab', 'medbay', 'greenhouse', 'workshop', 'radio'];
 
-/** The room a person works in today. Resting people stay in their home room. */
 const HOME: Record<string, RoomId> = { leo: 'workshop', mei: 'medbay', amara: 'greenhouse', otto: 'lab', sam: 'radio' };
 export function roomOf(crewId: string, job: EffectiveJob): RoomId | 'outside' {
   switch (job) {
@@ -51,10 +46,8 @@ export function roomOf(crewId: string, job: EffectiveJob): RoomId | 'outside' {
   }
 }
 
-/** Icon for a system, the same one the plan rows and the HUD use. */
 export const SYSTEM_ICON: Record<SystemId, string> = { life: 'air', shield: 'shield', greenhouse: 'crop', radio: 'radio', lab: 'science' };
 
-/** Picture for the event of today, by engine event id. Never call this before the event is revealed. */
 export function eventScene(id: string, s: GameState): string {
   const map: Record<string, string> = {
     dust_storm: 'scene-dust-storm', solar_storm: 'scene-radiation-storm', hull_crack: 'scene-hull-crack', antenna_off: 'scene-antenna-off',

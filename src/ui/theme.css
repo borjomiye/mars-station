@@ -1,6 +1,3 @@
-/* Pixel-art theme. Owner: P6 (art + UX). Dark station inside, rusty Mars outside,
-   bright colours only for resources, buttons and alarms. Fonts are bundled (no network):
-   Press Start 2P for titles and buttons, VT323 for all other text. VT323 has one weight: no fake bold. */
 :root {
   --bg: #161d26;
   --panel: #1e2731;
@@ -37,7 +34,6 @@
   --bubble-earth: #1d5a9e;
   --bubble-good: #2b7a32;
 
-  /* morning briefing ("variant A"): night sky, cream board, Mars ground */
   --brief-sky: #1a0b16;
   --brief-sky-storm: #2c0d14;
   --brief-sky-dust: #3a1b10;

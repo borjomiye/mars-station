@@ -1,5 +1,3 @@
-// "Why?" for the robot's current hint while planning. Mirrors the order of checks in helperLine (helper.ts),
-// so the answer always explains the line the robot is saying right now.
 import { cellsAvailable, cfg, effectiveJobs, planTotal, today, type GameState } from '../engine';
 import { zeroSols } from './helper';
 

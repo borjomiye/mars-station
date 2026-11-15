@@ -1,5 +1,4 @@
 {
-  "_note": "Discovery album (P4). Each card: a real NASA photo (src/assets/cards/<id>.jpg, from images.nasa.gov) and one fact. The fact is either taken from the photo's own NASA caption (fact + link) or is an OSDR fact from facts.json (factId). Texts only say what the source page says (checked 2026-11-15).",
   "cards": [
     {
       "id": "layered_rock",

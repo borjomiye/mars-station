@@ -12,7 +12,6 @@ import {
 
 export const SAVE_VERSION = 3;
 
-/** The sol state machine: which phase may follow which. */
 export const TRANSITIONS: Record<Phase, Phase[]> = {
   briefing: ['plan'],
   plan: ['event', 'results'],
@@ -68,7 +67,6 @@ function deliverAnswer(s: GameState, id: RadioMessageId): string {
   return t('sol.earthGotYourScienceReport');
 }
 
-/** Morning of the next sol. Mutates (called on a clone). */
 function nextSol(s: GameState): GameState {
   const c = cfg(s), prev = s.sol >= 1 ? today(s) : null, last = s.log[s.log.length - 1];
   if (s.sol >= 1) go(s, 'briefing'); else s.phase = 'briefing';
@@ -82,7 +80,6 @@ function nextSol(s: GameState): GameState {
       findCard(s, site.card);
     }
     M.lines.push(t('sol.theShipHomeLandsOn', { missionSols: c.MISSION_SOLS }));
-    // the twist and the tasks are shown on the morning board ("Mission Control"), not read out
     if (s.tasks.length) M.lines.push(t('sol.missionControlSentTasks', { count: s.tasks.length }));
   } else {
     const steps = t('sol.ofSteps', { crop: fmt(s.crop), cropStepsToHarvest: c.CROP_STEPS_TO_HARVEST });
@@ -96,14 +93,12 @@ function nextSol(s: GameState): GameState {
     else M.notes.push(t('sol.dustStormIsOverThe'));
     s.flags.panelsCovered = false;
   }
-  // Earth's answer arrives at breakfast, if the radio can hear it
   if (s.radio.queue.length) {
     if (isBlackout(s)) M.answers.push(t('sol.noWordFromEarthThe'));
     else if (radioBlocked(s)) M.answers.push(t('sol.noWordFromEarthThe2'));
     else { for (const m of s.radio.queue) M.answers.push(deliverAnswer(s, m.id)); s.radio.queue = []; }
   }
   for (let k = 1; k <= c.AUTO_FORECAST_SOLS; k++) know(s, s.sol + k);
-  // Mission Control checks the tasks whose last sol has passed
   for (const { def, task } of updateTasks(s, false)) {
     M.news.push(task.status === 'done' ? t('sol.taskDoneNote', { task: taskText(def), reward: def.reward }) : t('sol.taskMissedNote', { task: taskText(def) }));
   }
@@ -117,7 +112,6 @@ function nextSol(s: GameState): GameState {
   if (isBlackout(s)) word('conj');
   setSupply(s);
   s.today = { revealed: false, choice: null, sickId: null, skipEvent: false, before: null };
-  // yesterday's plan is today's starting point
   if (s.flags.prefill) {
     const pr = s.problems.find((p) => p.type === s.flags.prefill);
     if (pr) {
@@ -133,7 +127,6 @@ function nextSol(s: GameState): GameState {
   return s;
 }
 
-/** `setup` overrides what the mission name picks; '' = no landing site / no twist (plain numbers, used by the tests). */
 export function createMission(name: string, mode: Mode, setup: Partial<{ siteId: string; twistId: string; taskIds: string[]; owned: string[] }> = {}): GameState {
   const m: Mode = MODES.includes(mode) ? mode : 'medium', seed = normSeed(name), sched = buildSchedule(seed);
   const pick = { ...missionSetup(seed), ...setup }, c = cfg({ mode: m, siteId: pick.siteId, twistId: pick.twistId });
@@ -171,14 +164,13 @@ export function applyPlan(state: GameState, plan: Plan): GameState {
   const s = clone(state);
   s.plan = sanitizePlan(s, plan);
   const ch = s.today.choice;
-  if (ch) { // the event choice may no longer be valid (e.g. a lab scan without lab power)
+  if (ch) {
     const def = eventChoices(s).find((x) => x.id === ch.id);
     if (!def || !def.enabled) { s.today.choice = null; s.plan = sanitizePlan(s, s.plan); }
   }
   return s;
 }
 
-/** The event shows itself after the plan is confirmed for the first time. Mutates. */
 function revealEvent(s: GameState): void {
   if (s.today.revealed) return;
   s.today.revealed = true;
@@ -228,14 +220,13 @@ export function resolveEvent(state: GameState, choiceId: string, crewIds: string
   return s;
 }
 
-/** Runs the sol. Every result line names its cause. */
 export function playSol(state: GameState): { state: GameState; results: ResultLine[] } {
   if (state.phase !== 'plan' && state.phase !== 'event') return { state, results: [] };
   const s = clone(state), c = cfg(s), day = today(s), R: ResultLine[] = [];
   const say = (t: string, why = '') => { R.push({ t, why }); };
   revealEvent(s);
   const ev = currentEvent(s);
-  if (ev && !s.today.choice) { // bot or preview did not choose: take the last "do nothing" option
+  if (ev && !s.today.choice) {
     const l = eventChoices(s).filter((x) => x.enabled && !x.pick), d = l[l.length - 1];
     s.today.choice = { id: d.id, crew: [], job: null, task: null, label: d.label };
   }
@@ -258,7 +249,6 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
   const air = (d: number, why: string, key?: string) => tank('air', t('sol.airWater'), d, why, key);
   const food = (d: number, why: string) => tank('food', t('sol.food'), d, why);
 
-  // 0) events that act before the work day
   if (ev && ch && ev.id === 'sick_crew' && s.today.sickId) {
     const p = crewById(s, s.today.sickId);
     if (ch.id === 'medbay_now') { enterMedbay(s, p, c.ILLNESS_MEDBAY_STEPS, t('sol.feelingIll')); say(t('sol.wentToTheMedbay', { name: p.name }), t('sol.illYourChoice')); }
@@ -270,7 +260,6 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
     else say(t('sol.fuseRewiredNothingWentDark'), t('sol.spentTheDayOnIt', { names: names(withJob('rewire')) }));
   }
 
-  // 1) repairs inside and outside; free outside workers collect samples
   const repair = (where: string, workers: CrewMember[]): CrewMember[] => {
     const idle: CrewMember[] = [];
     workers.sort((a, b) => workPower(c, b, 'fix') - workPower(c, a, 'fix'));
@@ -291,7 +280,6 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
   };
   const task = ch ? ch.task : null, picked = ch ? ch.crew : [];
   const special = (id: string) => picked.includes(id) && (task === 'chance' || task === 'cover' || task === 'polish');
-  // nothing to fix = idle: neither heavy work nor rest
   for (const p of repair('inside', withJob('fix'))) { say(t('sol.hadNothingToFix', { name: p.name }), t('sol.nothingIsBrokenInside')); jobs[p.id] = 'idle'; }
   for (const p of repair('outside', withJob('outside').filter((x) => !special(x.id)))) {
     const n = workPower(c, p, 'outside');
@@ -307,7 +295,6 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
   }
   s.problems = s.problems.filter((pr) => !pr.fixed);
 
-  // 2) greenhouse
   const lamp = s.problems.find((p) => p.type === 'lamp_fault');
   const lf = lamp ? (c.PROBLEMS.lamp_fault.growthFactor || [1])[lamp.severity - 1] : 1;
   let steps = 0;
@@ -327,8 +314,6 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
     food(c.HARVEST_FOOD, t('sol.harvestCropReachedSteps', { cropStepsToHarvest: c.CROP_STEPS_TO_HARVEST }));
   }
 
-  // 3) lab
-  // A partly powered lab works at partial speed: 1 of 2 cells = half the work. Scanning needs the full lab.
   const labPower = isUnlocked(s, 'lab') ? Math.min(1, cells.lab / c.SYSTEMS.lab.want) : 0;
   const labOn = labPower >= 1 - 1e-9;
   for (const p of withJob('lab')) {
@@ -340,10 +325,8 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
       s.labWork = Math.max(0, r3(s.labWork - c.LAB_WORK_PER_SAMPLE));
       s.samples = r3(s.samples - 1);
       made = true;
-      // the mission name decides where in the list of lab finds this mission starts, so new missions bring new lab cards
       const lab = cards.filter((k) => k.kind === 'lab'), start = hashString(s.seed + ':lab') % lab.length;
       const order = [...lab.slice(start), ...lab.slice(0, start)], owned = s.cards.owned ?? [];
-      // cards already in the album come last, so a new mission brings new lab finds first
       const next = order.find((k) => !s.cards.found.includes(k.id) && !owned.includes(k.id)) ?? order.find((k) => !s.cards.found.includes(k.id));
       if (next) findCard(s, next.id, say, t('sol.studiedASample', { name: p.name }));
       else say(t('sol.sampleStudiedNothingNew'), t('sol.allLabCardsAreFound'));
@@ -352,7 +335,6 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
   }
   if (s.samples < 1) s.labWork = 0;
 
-  // 4) outcome of a chance and of outside tasks
   if (ev && ch && ev.kind === 'chance' && ev.id !== 'clean_wind') {
     if (ch.id === 'outside') {
       const p = crewById(s, picked[0]);
@@ -377,7 +359,6 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
     else say(t('sol.panelsLeftInTheDust'), t('sol.youWaitedItOut'));
   }
 
-  // 5) care: all of it goes to the first patient
   const carers = withJob('care'), careFor: Record<string, number> = {};
   if (carers.length) {
     const pts = carers.reduce((a, p) => a + workPower(c, p, 'care'), 0);
@@ -385,15 +366,12 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
     if (pat) careFor[pat.id] = pts; else say(t('sol.hadNobodyToCareFor', { carers: names(carers) }), t('sol.nobodyIsIll'));
   }
 
-  // 6) air & water
   const miss = c.SYSTEMS.life.want - cells.life;
   if (miss > 0) air(-miss * c.AIR_LOSS_PER_MISSING_CELL, t('sol.lifeSupportShort', { miss: plural(miss, 'cell') }), 'life');
   else if (miss < 0) air(-miss * c.AIR_GAIN_PER_EXTRA_CELL, t('sol.extraLifeSupportCell'), 'extra');
   for (const pr of s.problems) { const pd = c.PROBLEMS[pr.type]; if (pd.airLeak) air(-pd.airLeak * pr.severity, t('sol.leaks', { problem: pd.name.toLowerCase() }), pr.type); }
-  // 7) food
   food(-c.FOOD_EATEN_PER_SOL, t('sol.theCrewAte'));
 
-  // 8) radiation: the badge only fills
   if (storm) say(t('sol.solarStormDoseXWithout', { mult: storm.mult }), cells.shield >= c.SYSTEMS.shield.want ? t('sol.shieldAtFullPowerMinimum') : t('sol.shieldHasOfCells', { shield: cells.shield, want: c.SYSTEMS.shield.want }));
   for (const p of s.crew) {
     const j = jobs[p.id], r = doseFor(c, storm, j, cells.shield), b0 = badgeOf(c, p.dose);
@@ -407,7 +385,6 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
     }
   }
 
-  // 9) people: medbay, illness, tiredness
   for (const p of s.crew) {
     const j = jobs[p.id];
     if (j === 'medbay') {
@@ -440,7 +417,6 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
     }
   }
 
-  // 10) trouble left alone grows
   for (const pr of s.problems) {
     const pd = c.PROBLEMS[pr.type];
     pr.age++;
@@ -448,14 +424,12 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
   }
   if (ev && ch && ch.id === 'tomorrow' && ev.problem) s.flags.prefill = ev.problem;
 
-  // 11) milestone cards
   const next = dayAt(s, s.sol + 1);
   if (rec.harvests > 0) findCard(s, 'space_radishes', say, t('sol.firstHarvest'));
   if (day.storm && !(next && next.storm)) findCard(s, 'storm_survived', say, t('sol.theSolarStormPassed'));
   if (day.weather === 'dust' && !(next && next.weather === 'dust')) findCard(s, 'dust_survived', say, t('sol.theDustStormPassed'));
   if (isBlackout(s) && !isBlackout(s, s.sol + 1)) findCard(s, 'conjunction', say, t('sol.theRadioBlackoutEnded'));
 
-  // 12) unused cells
   const unused = rec.supply - planTotal(s.plan);
   if (unused > 0) {
     if (c.BATTERY_CAPACITY > 0) {
@@ -465,14 +439,12 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
     } else say(t('sol.lostAtSunset2', { unused: plural(unused, 'cell') }), t('sol.notSharedOut'));
   }
 
-  // 13) early return: nobody dies, Mission Control calls the crew home
   s.counters.airZero = s.air <= 0 ? s.counters.airZero + 1 : 0;
   s.counters.foodZero = s.food <= 0 ? s.counters.foodZero + 1 : 0;
   if (s.counters.airZero >= c.ZERO_SOLS_TO_LOSE) s.over = { won: false, why: 'air' };
   else if (s.counters.foodZero >= c.ZERO_SOLS_TO_LOSE) s.over = { won: false, why: 'food' };
   else if (s.counters.airZero || s.counters.foodZero) say(t('sol.warningATankIsEmpty'), t('sol.oneMoreEmptySolEnds'));
 
-  // 14) Mission Control tasks
   s.counters.airLow = Math.min(s.counters.airLow, s.air);
   for (const { def, task } of updateTasks(s, true)) {
     if (task.status === 'done') say(t('sol.taskDone', { reward: def.reward }), taskText(def));
@@ -485,7 +457,6 @@ export function playSol(state: GameState): { state: GameState; results: ResultLi
   return { state: s, results: R };
 }
 
-/** "What happens tonight" for the plan screen. An event that is not revealed yet is not peeked at. */
 export function previewSol(state: GameState): GameState {
   const s = clone(state);
   if (!s.today.revealed) { const d = s.schedule[s.sol - 1]; d.kind = 'quiet'; d.eventId = null; }
@@ -521,7 +492,6 @@ function endOrNext(s: GameState): GameState {
   if (s.sol >= cfg(s).MISSION_SOLS) { s.over = { won: true, why: 'ship' }; return go(s, 'report'); }
   return nextSol(s);
 }
-/** After the results: the evening call, the next morning, or the report. */
 export function proceed(state: GameState): GameState {
   if (state.phase !== 'results') return state;
   const s = clone(state);
@@ -529,7 +499,6 @@ export function proceed(state: GameState): GameState {
   if (radioCanSend(s)) return go(s, 'radio');
   return endOrNext(s);
 }
-/** One message per sol (or null for none). Earth answers next morning. */
 export function sendMessage(state: GameState, messageId: RadioMessageId | null): GameState {
   if (state.phase !== 'radio') return state;
   const s = clone(state), c = cfg(s), opt = messageOptions(s).find((m) => m.id === messageId);
@@ -541,5 +510,5 @@ export function sendMessage(state: GameState, messageId: RadioMessageId | null):
     }
     s.radio.queue.push({ id: messageId, sol: s.sol });
   }
-  return endOrNext(s); // a report or forecast request sent tonight is counted for tasks next morning
+  return endOrNext(s);
 }

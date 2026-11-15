@@ -1,5 +1,3 @@
-// The station as the game board: rooms light up from today's cells, crew stand where they work.
-// Hover a person for their card; tap them to pick a job. Owner: P6.
 import { useEffect, useState, type ReactNode } from 'react';
 import {
   JOBS, cfg, effectiveCells, fmt, effectiveJobs, isBlackout, isUnlocked, jobAllowed, problemNeed, radioBlocked, stormOn, today,
@@ -9,13 +7,11 @@ import { ROOMS, SYSTEM_ICON, board, crewArt, icon, roomOf, scene, stationArt, ty
 import { CrewCard, crewState } from './bits';
 import { FRAME_W } from './Frame';
 
-// Stage units: the station board (1600×448) centred with a strip of Mars on each side.
 const GUTTER = 130, BOTTOM = 34;
-const UNITS_W = board.board.w + 2 * GUTTER, K = FRAME_W / UNITS_W; // px per board unit
+const UNITS_W = board.board.w + 2 * GUTTER, K = FRAME_W / UNITS_W;
 const CREW_H = board.crewHeight * 1.15;
 const GROUND = board.board.groundY;
 const dome = board.layers.dome;
-// every flickering thing (dim room, dome, people inside) follows one switch, so lights and faces blink together
 const FLICKER_MS = 800;
 const reducedMotion = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 export const PROBLEM_ROOM: Record<string, RoomId> = { loose_pipe: 'workshop', pump_broken: 'workshop', lamp_fault: 'greenhouse', antenna_off: 'radio', hull_crack: 'lab' };
@@ -23,7 +19,6 @@ const JOB_ICON: Record<Job, string> = { grow: 'crop', fix: 'repair', outside: 'h
 
 type RoomState = 'locked' | 'dark' | 'dim' | 'on';
 
-/** Cells and jobs in effect: today's plan, or the record of the sol just played. */
 function layoutOf(s: GameState): { cells: Record<SystemId, number>; jobs: Record<string, EffectiveJob> } {
   const last = s.log[s.log.length - 1];
   if ((s.phase === 'results' || s.phase === 'radio') && last && last.sol === s.sol) return { cells: last.cells, jobs: last.jobs };
@@ -32,30 +27,26 @@ function layoutOf(s: GameState): { cells: Record<SystemId, number>; jobs: Record
 
 type Props = {
   s: GameState;
-  height: number;                                  // stage height in frame px
+  height: number;
   selected?: string | null;
-  onSelect?: (crewId: string | null) => void;      // tap a person (plan phase)
+  onSelect?: (crewId: string | null) => void;
   onJob?: (crewId: string, job: Job) => void;
-  overlay?: ReactNode;                             // things drawn on top (helper bubble, results)
-  notes?: Partial<Record<RoomId | 'outside', Note[]>>; // what each room did this sol, shown over it
+  overlay?: ReactNode;
+  notes?: Partial<Record<RoomId | 'outside', Note[]>>;
 };
 
-/** A result shown over a room after the sol: short text, an icon, good or bad. */
 export type Note = { text: string; icon: string; tone: 'good' | 'bad' | 'plain' };
 
 export function Station({ s, height, selected, onSelect, onJob, overlay, notes }: Props) {
   const c = cfg(s), day = today(s), st = stormOn(s), { cells, jobs } = layoutOf(s);
   const dusty = day.weather === 'dust' || s.problems.some((p) => p.type === 'dusty_panels');
-  const top = height - (board.board.h + BOTTOM) * K;           // station board top in px
+  const top = height - (board.board.h + BOTTOM) * K;
   const X = (u: number) => (u + GUTTER) * K, Y = (u: number) => top + u * K;
 
-  // Lit means "does something today": every room helps with one cell (the lab at half speed);
-  // the radio needs its one cell. Short of the need, the chip shows a warning.
   const roomState = (id: RoomId): RoomState => {
     const sys = board.rooms[id].system, n = cells[sys];
     if (!isUnlocked(s, sys)) return 'locked';
     if (n === 0) return 'dark';
-    // the radio sends only with its cell; the lab works at partial speed from one cell
     if (id === 'radio' && n < c.SYSTEMS[sys].want) return 'dark';
     if (id === 'radio' && (isBlackout(s) || radioBlocked(s))) return 'dark';
     if (id === 'greenhouse' && s.problems.some((p) => p.type === 'lamp_fault')) return 'dim';
@@ -64,13 +55,11 @@ export function Station({ s, height, selected, onSelect, onJob, overlay, notes }
   const roomWarn = (id: RoomId) => {
     const sys = board.rooms[id].system, n = cells[sys], d = c.SYSTEMS[sys];
     if (!isUnlocked(s, sys) || n >= d.want) return false;
-    // a warning only where being short hurts: air drops, or a storm dose gets bigger
     if (id === 'workshop') return true;
     if (id === 'medbay') return !!st;
     return false;
   };
 
-  // broken lamps: one shared on/off switch for the room, the dome and everyone inside
   const anyDim = ROOMS.some((id) => roomState(id) === 'dim');
   const [blinkOff, setBlinkOff] = useState(false);
   useEffect(() => {
@@ -120,8 +109,6 @@ export function Station({ s, height, selected, onSelect, onJob, overlay, notes }
       <div className="st-ground" style={{ top: Y(GROUND - 34), left: X(-40), width: (board.board.w + 80) * K, height: 70 * K }} />
       <img className="st-board" src={stationArt('station-board')} alt="" style={{ left: X(0), top: Y(0), width: board.board.w * K }} />
 
-      {/* the greenhouse is round: the dome layer drawn again, darkened and cut to the glass only (the base keeps its light).
-          Always rendered so turning the power on and off fades. */}
       <img className={`st-dome-dark ${roomState('greenhouse')}`} src={stationArt('dome')} alt="" style={{ left: X(dome.x), top: Y(dome.y), width: dome.w * K }} />
 
       {ROOMS.map((id) => {
@@ -160,7 +147,6 @@ export function Station({ s, height, selected, onSelect, onJob, overlay, notes }
 
       {ROOMS.flatMap((id) => {
         const ids = groups[id] ?? [], r = board.rooms[id], floor = Y(r.slots[0].y), light = roomState(id);
-        // more than 3 people in one room (the storm shelter): names show on hover only, so they do not pile up
         return ids.map((cid, i) => figure(cid, X(r.x + (r.w * (i + 1)) / (ids.length + 1)), floor, false, id === 'radio' || id === 'workshop' ? 'left' : 'right', light, ids.length > 3));
       })}
 
@@ -173,8 +159,6 @@ export function Station({ s, height, selected, onSelect, onJob, overlay, notes }
       {notes && (Object.keys(notes) as (RoomId | 'outside')[]).map((id, k) => {
         const list = notes[id] ?? [];
         if (!list.length) return null;
-        // notes never cover anyone: over a room they float above its roof (and above the dome's chips);
-        // outside they float above the walkers' heads, starting at the left edge so nothing is cut off
         const style = id === 'outside'
           ? { left: X(-GUTTER) + 8, top: Y(GROUND + 22 - board.crewHeight) - 10 }
           : { left: X(board.rooms[id].x + board.rooms[id].w / 2), top: Y(board.rooms[id].y) - (id === 'greenhouse' ? 62 : 34) };

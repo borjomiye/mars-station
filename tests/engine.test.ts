@@ -1,4 +1,3 @@
-// Engine rules, determinism, win/lose and a full simulated mission per mode.
 import { existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import factsFile from '../src/data/facts.json';
@@ -13,7 +12,6 @@ const C = cfg('medium');
 const D0 = C.DOSE_INDOOR_PER_SOL;
 const sched = (s: GameState) => s.schedule.map((d) => d.kind[0] + (d.eventId || '-') + d.weather[0] + (d.storm ? 'S' : '')).join(' ');
 
-/** A clean lab mission without events, for single-rule checks. */
 function mk(sol: number, edit?: (s: GameState) => void): GameState {
   const s = createMission('unit test', 'medium', { siteId: '', twistId: '', taskIds: [] });
   for (const d of s.schedule) { d.kind = 'quiet'; d.eventId = null; d.storm = null; d.weather = 'clear'; d.real = []; }
@@ -241,7 +239,7 @@ describe('lab, science and radio', () => {
   it('the scientist turns a sample into a card in one sol; a half-powered lab works at half speed; a dark lab does nothing', () => {
     const ok = run(mk(6, (t) => { t.samples = 1; }), plan({ lab: 2 }, { otto: 'lab' }));
     const labCards = (s: GameState) => s.cards.found.filter((id) => cardDef(id).kind === 'lab');
-    expect(labCards(ok)).toHaveLength(1); // which lab card comes first depends on the mission name
+    expect(labCards(ok)).toHaveLength(1);
     expect(ok.samples).toBeCloseTo(0);
     const half = run(mk(6, (t) => { t.samples = 1; }), plan({ lab: 1 }, { otto: 'lab' }));
     expect(labCards(half)).toHaveLength(0);

@@ -1,5 +1,4 @@
 {
-    "_note":  "Station board layout in board pixels (station-board.png is the same size). Rooms are the open windows; slots are where a crew member\u0027s feet go (anchor bottom-centre). Scale everything together.",
     "board":  {
                   "w":  1600,
                   "h":  448,

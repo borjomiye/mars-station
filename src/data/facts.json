@@ -1,6 +1,5 @@
 {
   "stub": false,
-  "_note": "Owner: P4. Space biology facts from NASA OSDR (Open Science Data Repository). Each text only says what the study page itself says (checked 2026-11-15). Cards point here with factId. Do not invent facts.",
   "facts": [
     {
       "id": "osd342_muscle_bone",

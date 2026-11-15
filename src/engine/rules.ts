@@ -62,7 +62,6 @@ export function jobAllowed(s: GameState, p: CrewMember, j: Job): { ok: boolean; 
   return { ok: true, why: '' };
 }
 
-/** Makes any plan legal: locked systems get 0, cells never exceed the supply, jobs are allowed. */
 export function sanitizePlan(s: GameState, plan: Plan): Plan {
   const c = cfg(s);
   const cells = {} as Record<SystemId, number>, jobs: Record<string, Job> = {};
@@ -74,7 +73,6 @@ export function sanitizePlan(s: GameState, plan: Plan): Plan {
   }
   let total = SYSTEMS.reduce((a, k) => a + cells[k], 0);
   const avail = cellsAvailable(s);
-  // without a storm the shield does nothing, so it is trimmed first
   const order: SystemId[] = stormOn(s) ? c.TRIM_ORDER : ['shield', ...c.TRIM_ORDER.filter((k) => k !== 'shield')];
   for (const k of order) while (total > avail && cells[k] > 0) { cells[k]--; total--; }
   for (const p of s.crew) {
@@ -85,7 +83,6 @@ export function sanitizePlan(s: GameState, plan: Plan): Plan {
   return { cells, jobs };
 }
 
-/** Cells after the event choice (a blown fuse can turn a system dark). */
 export function effectiveCells(s: GameState): Record<SystemId, number> {
   const cells = { ...s.plan.cells }, ch = s.today.choice;
   if (ch && s.today.revealed) {
@@ -95,7 +92,6 @@ export function effectiveCells(s: GameState): Record<SystemId, number> {
   return cells;
 }
 
-/** Jobs after the medbay and the event choice. */
 export function effectiveJobs(s: GameState): Record<string, EffectiveJob> {
   const c = cfg(s), out: Record<string, EffectiveJob> = {}, ev = currentEvent(s), ch = s.today.choice;
   for (const p of s.crew) {
@@ -123,10 +119,8 @@ export function effectiveJobs(s: GameState): Record<string, EffectiveJob> {
   return out;
 }
 
-/** Dose of one sol: d = total, extra = what the storm added above a normal day. */
 export function doseFor(c: Balance, storm: { mult: number } | null, job: EffectiveJob, shieldCells: number): { d: number; extra: number } {
   const out = job === 'outside';
-  // the shield also trims a little of the everyday cosmic-ray dose for everyone inside (game simplification, see balance.json)
   const cover = Math.min(1, shieldCells / c.SYSTEMS.shield.want), base = c.DOSE_INDOOR_PER_SOL * (out ? 1 : 1 - (c.SHIELD_DAILY_CUT ?? 0) * cover);
   if (!storm) return { d: base + (out ? c.DOSE_OUTSIDE_TRIP : 0), extra: 0 };
   if (out) { const d = (base + c.DOSE_OUTSIDE_TRIP) * storm.mult; return { d, extra: d - base - c.DOSE_OUTSIDE_TRIP }; }
@@ -138,7 +132,6 @@ export function doseFor(c: Balance, storm: { mult: number } | null, job: Effecti
 export function workPower(c: Balance, p: CrewMember, kind: string): number {
   return c.JOB_OUTPUT[kind] * (c.SPECIALIST_OF[p.role] === kind ? c.SPECIALIST_MULT : 1) * (p.cond === 'tired' ? c.TIRED_EFFECT : 1) * (p.sick ? c.SICK_EFFECT : 1);
 }
-/** 1 = fresh, 0 = tired, ill or in the medbay. For the energy bar. */
 export function energyOf(c: Balance, p: CrewMember): number {
   return p.medbay > 0 || p.sick || p.cond === 'tired' ? 0 : clamp(1 - p.heavyStreak / c.HEAVY_SOLS_TO_TIRED, 0, 1);
 }
@@ -150,8 +143,6 @@ export function forecastFor(s: GameState, sol: number): Forecast {
 export function knownForecast(s: GameState): Forecast[] {
   return s.known.filter((n) => n > s.sol).sort((a, b) => a - b).map((n) => forecastFor(s, n));
 }
-
-// ---------- mutating helpers (engine only, on a clone) ----------
 
 export function addProblem(s: GameState, type: string): Problem {
   const old = s.problems.find((p) => p.type === type), c = cfg(s);
@@ -175,8 +166,6 @@ export function findCard(s: GameState, id: string | null | undefined, say?: (t: 
 export function know(s: GameState, sol: number): void {
   if (sol <= cfg(s).MISSION_SOLS && !s.known.includes(sol)) s.known.push(sol);
 }
-
-// ---------- event choices: every one has a "+" and a "−" price ----------
 
 export function eventChoices(s: GameState): Choice[] {
   const c = cfg(s), ev = currentEvent(s), out: Choice[] = [];
