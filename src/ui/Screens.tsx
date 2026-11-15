@@ -17,33 +17,84 @@ type TitleProps = {
   onLaunch: () => void; saved: GameState | null; onContinue: () => void; onAlbum: () => void; onData: () => void; albumCount: number;
 };
 export function TitleScreen(p: TitleProps) {
+  const [help, setHelp] = useState(false);
   return (
     <div className="screen title">
       <img className="screen-bg" src={scene('scene-station')} alt="The station on Mars: two modules and a glass greenhouse dome" />
-      <img className="title-robot" src={robotArt('robot-wave')} alt="" />
-      <div className="title-panel">
-        <h1>Mars Outpost</h1>
-        <p>You are the captain of a small station on Mars. Keep five people safe for 15 sols until the ship home lands.</p>
+      <img className="title-robot" src={robotArt('robot-point')} alt="" />
+
+      <nav className="title-corner" aria-label="More">
+        <button className="corner-btn" onClick={p.onAlbum} aria-label={`Album, ${p.albumCount} of ${cards.length} collected`}>
+          <img src={icon('card-back')} alt="" />
+          <span className="corner-badge" aria-hidden="true">{p.albumCount}/{cards.length}</span>
+          <span className="corner-tip" aria-hidden="true">Album</span>
+        </button>
+        <button className="corner-btn" onClick={p.onData} aria-label="Where the data comes from">
+          <svg viewBox="0 0 14 14" shapeRendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M2 11h10v1H2zM3 7h2v4H3zM6 4h2v7H6zM9 2h2v9H9z" /></svg>
+          <span className="corner-tip" aria-hidden="true">Where the data comes from</span>
+        </button>
+      </nav>
+
+      <main className="title-panel">
+        <header className="title-head">
+          <p className="title-tag">A 15-sol survival sim</p>
+          <h1>Mars Outpost</h1>
+          <p className="title-goal">Keep your crew of five alive for 15 sols until the ship home lands.</p>
+        </header>
         {donki.stub && <p className="warning">Placeholder space weather: replace with real DONKI data before the demo.</p>}
-        <label className="title-name">
-          <span>Mission name <span className="muted">(same name = same Mars)</span></span>
-          <span className="row">
-            <input value={p.name} maxLength={24} onChange={(e) => p.setName(e.target.value.replace(/[^\p{L}\p{N} -]/gu, ''))} aria-label="Mission name" placeholder="Brave Otter" />
-            <button className="secondary small" onClick={p.onRandom}>Random</button>
-          </span>
-        </label>
-        <div className="row" role="group" aria-label="Difficulty">
-          {MODES.map((m) => <button key={m} className={p.mode === m ? '' : 'secondary'} aria-pressed={p.mode === m} onClick={() => p.setMode(m)}>{MODE_NAME[m]}</button>)}
+
+        <div className="title-step">
+          <label className="step-label" htmlFor="mission-name"><span className="step-num" aria-hidden="true">1</span>Name your mission</label>
+          <div className="name-field">
+            <input
+              id="mission-name" value={p.name} maxLength={24} autoComplete="off" placeholder="Brave Otter"
+              onChange={(e) => p.setName(e.target.value.replace(/[^\p{L}\p{N} -]/gu, ''))}
+              onKeyDown={(e) => { if (e.key === 'Enter') p.onLaunch(); }}
+            />
+            <button className="dice" onClick={p.onRandom} aria-label="Random mission name" title="Random name">
+              <svg viewBox="0 0 13 13" shapeRendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M2 1h9v1H2zM1 2h1v9H1zM11 2h1v9h-1zM2 11h9v1H2zM3 3h2v2H3zM8 3h2v2H8zM5 5h3v3H5zM3 8h2v2H3zM8 8h2v2H8z" /></svg>
+            </button>
+          </div>
         </div>
-        <div className="row">
-          <button className="big" onClick={p.onLaunch}>Launch mission ▶</button>
-          {p.saved && <button className="secondary" onClick={p.onContinue}>Continue {p.saved.name} · sol {p.saved.sol}</button>}
+
+        <div className="title-step">
+          <p className="step-label" id="diff-label"><span className="step-num" aria-hidden="true">2</span>Choose difficulty</p>
+          <div className="segmented" role="radiogroup" aria-labelledby="diff-label">
+            {MODES.map((m) => (
+              <button key={m} role="radio" aria-checked={p.mode === m} className={p.mode === m ? 'on' : ''} onClick={() => p.setMode(m)}>
+                {p.mode === m && <svg viewBox="0 0 8 8" shapeRendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M6 1h1v1H6zM5 2h1v1H5zM4 3h1v1H4zM1 4h1v1H1zM3 4h1v1H3zM2 5h1v1H2z" /></svg>}
+                {MODE_NAME[m]}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="row">
-          <button className="secondary small" onClick={p.onAlbum}><img className="btn-icon" src={icon('card-back')} alt="" />Album {p.albumCount}/{cards.length}</button>
-          <button className="secondary small" onClick={p.onData}>Where the data comes from</button>
+
+        <button className="launch" onClick={p.onLaunch}>
+          <span className="step-num" aria-hidden="true">3</span>
+          Launch mission
+          <svg viewBox="0 0 12 12" shapeRendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M8 1h2v1h1v2h-1v1H9v1H8v1H7v1H6V7H5V6H4V5h1V4h1V3h1V2h1zM2 6h2v1H2zM5 9h1v2H5zM2 8h2v1H3v1H2z" /></svg>
+        </button>
+        <div className="title-more">
+          <button className="ghost" onClick={() => setHelp(true)}>How to play</button>
+          {p.saved && <button className="ghost" onClick={p.onContinue}>Continue {p.saved.name} · sol {p.saved.sol}</button>}
         </div>
-      </div>
+      </main>
+
+      {help && (
+        <div className="overlay" onClick={() => setHelp(false)}>
+          <div className="overlay-box" role="dialog" aria-modal="true" aria-labelledby="htp-title" onClick={(e) => e.stopPropagation()}>
+            <div className="overlay-head">
+              <h2 id="htp-title">How to play</h2>
+              <button className="secondary small" onClick={() => setHelp(false)} aria-label="Close" autoFocus>X</button>
+            </div>
+            <ol className="overlay-body htp-steps">
+              <li><span className="step-num">1</span>[Placeholder] Read the morning report for the sol.</li>
+              <li><span className="step-num">2</span>[Placeholder] Make your decisions for the station.</li>
+              <li><span className="step-num">3</span>[Placeholder] Keep all five safe until sol 15.</li>
+            </ol>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
