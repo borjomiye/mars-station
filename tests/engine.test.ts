@@ -212,8 +212,12 @@ describe('crew', () => {
 });
 
 describe('radiation', () => {
-  it('storm + full shield: minimum dose inside', () => {
-    expect(dose(run(mk(6, storm), plan({ shield: 3 })), 'leo')).toBeCloseTo(D0);
+  it('storm + full shield: minimum dose inside (the shield also trims the everyday dose)', () => {
+    expect(dose(run(mk(6, storm), plan({ shield: 3 })), 'leo')).toBeCloseTo(D0 * (1 - C.SHIELD_DAILY_CUT));
+  });
+  it('a quiet sol: a full shield trims the everyday dose, an empty one does not', () => {
+    expect(dose(run(mk(6), plan({ shield: 3 })), 'leo')).toBeCloseTo(D0 * (1 - C.SHIELD_DAILY_CUT));
+    expect(dose(run(mk(6), plan({ shield: 0 })), 'leo')).toBeCloseTo(D0);
   });
   it('storm + no shield: the storm multiplier applies inside', () => {
     expect(dose(run(mk(6, storm), plan({ shield: 0 })), 'leo')).toBeCloseTo(D0 * C.STORM_MULT_BY_DAY[0]);

@@ -125,7 +125,9 @@ export function effectiveJobs(s: GameState): Record<string, EffectiveJob> {
 
 /** Dose of one sol: d = total, extra = what the storm added above a normal day. */
 export function doseFor(c: Balance, storm: { mult: number } | null, job: EffectiveJob, shieldCells: number): { d: number; extra: number } {
-  const base = c.DOSE_INDOOR_PER_SOL, out = job === 'outside';
+  const out = job === 'outside';
+  // the shield also trims a little of the everyday cosmic-ray dose for everyone inside (game simplification, see balance.json)
+  const cover = Math.min(1, shieldCells / c.SYSTEMS.shield.want), base = c.DOSE_INDOOR_PER_SOL * (out ? 1 : 1 - (c.SHIELD_DAILY_CUT ?? 0) * cover);
   if (!storm) return { d: base + (out ? c.DOSE_OUTSIDE_TRIP : 0), extra: 0 };
   if (out) { const d = (base + c.DOSE_OUTSIDE_TRIP) * storm.mult; return { d, extra: d - base - c.DOSE_OUTSIDE_TRIP }; }
   const gap = 1 - Math.min(1, shieldCells / c.SYSTEMS.shield.want);
