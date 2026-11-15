@@ -82,12 +82,12 @@ export function Station({ s, height, selected, onSelect, onJob, overlay, notes }
   const groups: Record<string, string[]> = {};
   for (const p of s.crew) { const r = roomOf(p.id, jobs[p.id] ?? 'rest'); (groups[r] ??= []).push(p.id); }
 
-  const figure = (id: string, cx: number, footY: number, suit: boolean, side: 'left' | 'right', light: RoomState = 'on') => {
+  const figure = (id: string, cx: number, footY: number, suit: boolean, side: 'left' | 'right', light: RoomState = 'on', crowded = false) => {
     const p = s.crew.find((q) => q.id === id)!, job = jobs[id] ?? 'rest', h = CREW_H * K, w = h * 0.62;
     const state = crewState(p).key ?? (job === 'rest' || job === 'shelter' ? 'sleep' : null);
     const isSel = selected === id, canJob = !!onJob && s.sol >= c.JOB_UNLOCK_SOL && p.medbay <= 0;
     return (
-      <div key={id} className={`st-crew${isSel ? ' selected' : ''}${light === 'dark' || light === 'locked' ? ' in-dark' : light === 'dim' ? ' in-dim' : ''} tip-${side}`} style={{ left: cx - w / 2, top: footY - h, width: w, height: h }}>
+      <div key={id} className={`st-crew${crowded ? ' crowded' : ''}${isSel ? ' selected' : ''}${light === 'dark' || light === 'locked' ? ' in-dark' : light === 'dim' ? ' in-dim' : ''} tip-${side}`} style={{ left: cx - w / 2, top: footY - h, width: w, height: h }}>
         <button className="st-crew-hit" aria-label={`${p.name}, ${p.role}: ${job}`} aria-expanded={isSel}
           onClick={() => onSelect?.(isSel ? null : id)}>
           {state && <img className="st-status" src={icon(state)} alt="" />}
@@ -160,7 +160,8 @@ export function Station({ s, height, selected, onSelect, onJob, overlay, notes }
 
       {ROOMS.flatMap((id) => {
         const ids = groups[id] ?? [], r = board.rooms[id], floor = Y(r.slots[0].y), light = roomState(id);
-        return ids.map((cid, i) => figure(cid, X(r.x + (r.w * (i + 1)) / (ids.length + 1)), floor, false, id === 'radio' || id === 'workshop' ? 'left' : 'right', light));
+        // more than 3 people in one room (the storm shelter): names show on hover only, so they do not pile up
+        return ids.map((cid, i) => figure(cid, X(r.x + (r.w * (i + 1)) / (ids.length + 1)), floor, false, id === 'radio' || id === 'workshop' ? 'left' : 'right', light, ids.length > 3));
       })}
 
       {[0, 1].map((i) => (
