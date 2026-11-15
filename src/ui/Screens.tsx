@@ -126,7 +126,7 @@ export function EventScreen({ s, picking, onChoose, onTogglePick, onPickConfirm,
   const repairNeed = problem ? Math.max(0, problemNeed(c, problem) - problem.done) : null;
   const picked = picking ? picking.ids.reduce((a, id) => a + workPower(c, crewById(s, id), 'fix'), 0) : 0;
   return (
-    <div className="screen event">
+    <div className={`screen event ev-${ev.id}`}>
       <img className="screen-bg" src={eventScene(ev.id, s)} alt="" />
       <div className={`event-head ${ev.kind}`}>
         <img src={icon(ev.kind === 'trouble' ? 'warning' : 'star')} alt="" />

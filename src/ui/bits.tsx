@@ -1,4 +1,5 @@
 // Small pieces shared by the screens: top bar, crew card, dose badge, robot mood, morning report lines.
+import { useEffect, useRef, useState } from 'react';
 import {
   badgeOf, cellsAvailable, cfg, effectiveJobs, energyOf, fmt, fmt2, getMorning, isBlackout, plural, stormOn, today,
   type Badge, type CrewMember, type GameState, type RealEvent,
@@ -24,12 +25,24 @@ export function SoundToggle({ className }: { className: string }) {
 
 // ---------- top bar ----------
 
+/** 'up' / 'down' right after the value changed, so the number can bounce or shake (motion.css). */
+function useChange(value: number): '' | 'up' | 'down' {
+  const prev = useRef(value);
+  const [dir, setDir] = useState<'' | 'up' | 'down'>('');
+  useEffect(() => {
+    if (value !== prev.current) setDir(value > prev.current ? 'up' : 'down');
+    prev.current = value;
+  }, [value]);
+  return dir;
+}
+
 function Meter({ img, label, value, max, color }: { img: string; label: string; value: number; max: number; color: string }) {
+  const dir = useChange(value);
   return (
     <div className="hud-meter" title={`${label}: ${fmt(value)} of ${max}`}>
       <img src={img} alt="" />
       <div className="hud-meter-body">
-        <div className="hud-meter-label"><span>{label}</span><b>{fmt(value)}/{max}</b></div>
+        <div className="hud-meter-label"><span>{label}</span><b key={value} className={dir ? `tick ${dir}` : undefined}>{fmt(value)}/{max}</b></div>
         <div className="bar" role="meter" aria-label={label} aria-valuenow={value} aria-valuemin={0} aria-valuemax={max}>
           <div style={{ width: `${Math.min(100, (100 * value) / max)}%`, background: color }} />
         </div>
