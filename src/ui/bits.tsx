@@ -102,13 +102,20 @@ export function helperMood(s: GameState): 'alert' | 'worried' | 'happy' | 'think
 
 export type Beat = { kind: 'say' | 'alert' | 'earth' | 'good' | 'word' | 'real' | 'today' | 'forecast'; text: string; real?: RealEvent; small?: string };
 
-export function beatsOf(s: GameState): Beat[] {
+/** What the robot says out loud. From sol 2 on the engine's `lines` are the station status
+ *  (harvest, repairs, medbay); the morning board shows those as cards, so it passes `withStatus = false`. */
+export function talkOf(s: GameState, withStatus = true): Beat[] {
   const m = getMorning(s), out: Beat[] = [];
   for (const a of m.answers) out.push({ kind: 'earth', text: `Earth: ${a}` });
-  for (const l of m.lines) out.push({ kind: 'say', text: l });
+  if (withStatus || s.sol === 1) for (const l of m.lines) out.push({ kind: 'say', text: l });
   for (const l of m.notes) out.push({ kind: 'alert', text: l });
   if (m.storm) out.push({ kind: 'alert', text: `Solar storm today: dose x${m.storm.mult} unless the shield is fully powered.` });
   if (m.blackout) out.push({ kind: 'alert', text: 'Radio blackout today: the Sun is between Mars and Earth.' });
+  return out;
+}
+
+export function beatsOf(s: GameState): Beat[] {
+  const m = getMorning(s), out: Beat[] = talkOf(s);
   if (m.unlocked.length) out.push({ kind: 'good', text: `New today: ${m.unlocked.join(', ')}!` });
   for (const w of m.words) out.push({ kind: 'word', text: `New word · ${w}` });
   for (const e of m.real) out.push({ kind: 'real', text: `Real event · ${e.date} · ${e.label}`, real: e });
