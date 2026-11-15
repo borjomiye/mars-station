@@ -1,101 +1,142 @@
 {
-  "_note": "Discovery album. Titles and unlock hints only: real NASA photos, facts and source links still have to be added (P4).",
+  "_note": "Discovery album (P4). Each card: a real NASA photo (src/assets/cards/<id>.jpg, from images.nasa.gov) and one fact. The fact is either taken from the photo's own NASA caption (fact + link) or is an OSDR fact from facts.json (factId). Texts only say what the source page says (checked 2026-11-15).",
   "cards": [
     {
       "id": "layered_rock",
       "title": "Layered rock",
       "kind": "chance",
-      "hint": "Look at a strange rock"
+      "hint": "Look at a strange rock",
+      "fact": "The Curiosity rover found finely layered rocks on Mount Sharp. The layers show that wind once piled this sand into moving dunes.",
+      "link": "https://images.nasa.gov/details/PIA21043",
+      "photo": { "nasaId": "PIA21043", "alt": "Layered rocks of the Murray Buttes on Mars, seen by Curiosity", "credit": "NASA/JPL-Caltech/MSSS" }
     },
     {
       "id": "blue_sunset",
       "title": "Blue sunset",
       "kind": "chance",
-      "hint": "Watch a clear sunset"
+      "hint": "Watch a clear sunset",
+      "fact": "On Mars, sunsets look blue! Fine dust in the air lets blue light through near the Sun. Curiosity took this photo on April 15, 2015.",
+      "link": "https://images.nasa.gov/details/PIA19400",
+      "photo": { "nasaId": "PIA19400", "alt": "A blue sunset over the hills of Gale Crater on Mars", "credit": "NASA/JPL-Caltech/MSSS/Texas A&M Univ." }
     },
     {
       "id": "morning_frost",
       "title": "Morning frost",
       "kind": "chance",
-      "hint": "Catch the frost at dawn"
+      "hint": "Catch the frost at dawn",
+      "fact": "The Phoenix lander dug a trench in the Martian ground and saw frost in it one morning, on its 113th Martian day.",
+      "link": "https://images.nasa.gov/details/PIA11182",
+      "photo": { "nasaId": "PIA11182", "alt": "Pale frost inside a trench dug by the Phoenix lander", "credit": "NASA/JPL-Caltech/University of Arizona/Texas A&M University" }
     },
     {
       "id": "dust_devil",
       "title": "Dust devil",
       "kind": "chance",
-      "hint": "Follow a whirlwind"
+      "hint": "Follow a whirlwind",
+      "fact": "Dust devils are little whirlwinds on Mars. They have blown dust off the solar panels of the rovers Spirit and Opportunity and given them more power.",
+      "link": "https://images.nasa.gov/details/PIA21457",
+      "photo": { "nasaId": "PIA21457", "alt": "A dust devil seen from above as a white puff over red hills", "credit": "NASA/JPL-Caltech/Univ. of Arizona" }
     },
     {
       "id": "lab_1",
-      "title": "Lab find 1",
+      "title": "Plants feel down",
       "kind": "lab",
-      "hint": "Power the lab"
+      "hint": "Power the lab",
+      "factId": "osd480_plant_gravity",
+      "photo": { "nasaId": "iss054e026863", "alt": "The Plant Gravity Perception experiment in a centrifuge on the Space Station", "credit": "NASA" }
     },
     {
       "id": "lab_2",
-      "title": "Lab find 2",
+      "title": "Space lettuce",
       "kind": "lab",
-      "hint": "Study a second sample"
+      "hint": "Study a second sample",
+      "factId": "osd268_veggie_lettuce",
+      "photo": { "nasaId": "iss040e009126", "alt": "Astronaut Steve Swanson harvests lettuce from the Veggie garden", "credit": "NASA" }
     },
     {
       "id": "lab_3",
-      "title": "Lab find 3",
+      "title": "Station germs",
       "kind": "lab",
-      "hint": "Study a third sample"
+      "hint": "Study a third sample",
+      "factId": "osd67_station_germs",
+      "photo": { "nasaId": "iss043e198418", "alt": "Astronaut Scott Kelly collects samples of germs on the Space Station", "credit": "NASA" }
     },
     {
       "id": "lab_4",
-      "title": "Lab find 4",
+      "title": "Light or dark",
       "kind": "lab",
-      "hint": "Study a fourth sample"
+      "hint": "Study a fourth sample",
+      "factId": "osd678_light_dark",
+      "photo": { "nasaId": "iss054e022372", "alt": "Small Arabidopsis plants growing in dishes on the Space Station", "credit": "NASA" }
     },
     {
       "id": "lab_5",
-      "title": "Lab find 5",
+      "title": "Slow healing",
       "kind": "lab",
-      "hint": "Study a fifth sample"
+      "hint": "Study a fifth sample",
+      "factId": "osd396_bone_healing",
+      "photo": { "nasaId": "iss059e027387", "alt": "Astronaut Nick Hague moves mice into their habitat on the Space Station", "credit": "NASA" }
     },
     {
       "id": "lab_6",
-      "title": "Lab find 6",
+      "title": "Spin for your eyes",
       "kind": "lab",
-      "hint": "Study a sixth sample"
+      "hint": "Study a sixth sample",
+      "factId": "osd758_spin_eyes",
+      "photo": { "nasaId": "iss061e060142", "alt": "Astronauts Andrew Morgan and Jessica Meir study mice in a glovebox on the Space Station", "credit": "NASA" }
     },
     {
       "id": "space_radishes",
       "title": "Space radishes",
       "kind": "milestone",
-      "hint": "Bring in a harvest"
+      "hint": "Bring in a harvest",
+      "fact": "In 2020, astronaut Kate Rubins grew radishes on the Space Station. The experiment studies how plants grow in space and how they taste.",
+      "link": "https://images.nasa.gov/details/iss064e006452",
+      "photo": { "nasaId": "iss064e006452", "alt": "Astronaut Kate Rubins checks radish plants growing on the Space Station", "credit": "NASA" }
     },
     {
       "id": "storm_survived",
       "title": "Storm watcher",
       "kind": "milestone",
-      "hint": "Survive a storm"
+      "hint": "Survive a storm",
+      "fact": "This is a real X-class solar flare, seen by NASA's Solar Dynamics Observatory on March 29, 2014. Solar flares are powerful bursts of radiation.",
+      "link": "https://images.nasa.gov/details/GSFC_20171208_Archive_e001164",
+      "photo": { "nasaId": "GSFC_20171208_Archive_e001164", "alt": "A bright solar flare bursting from the glowing surface of the Sun", "credit": "NASA" }
     },
     {
       "id": "first_call",
       "title": "Hello, Earth",
       "kind": "milestone",
-      "hint": "Send a radio message"
+      "hint": "Send a radio message",
+      "fact": "This is Earth and its Moon, photographed from Mars on November 20, 2016. The Moon is much darker than Earth, so it was made brighter to see it.",
+      "link": "https://images.nasa.gov/details/PIA21260",
+      "photo": { "nasaId": "PIA21260", "alt": "Earth and the Moon as two small dots on black space, seen from Mars", "credit": "NASA/JPL-Caltech/Univ. of Arizona" }
     },
     {
       "id": "bones",
       "title": "Bones in space",
       "kind": "milestone",
-      "hint": "Ask the doctors"
+      "hint": "Ask the doctors",
+      "factId": "osd342_muscle_bone",
+      "photo": { "nasaId": "iss056e097340", "alt": "Astronaut Drew Feustel checks on mice inside a glovebox on the Space Station", "credit": "NASA" }
     },
     {
       "id": "dust_survived",
       "title": "Dust storm",
       "kind": "milestone",
-      "hint": "Sit out a dust storm"
+      "hint": "Sit out a dust storm",
+      "fact": "In June 2018, a huge dust storm grew on Mars and covered the Opportunity rover. Dust storms like this can last weeks or even months.",
+      "link": "https://images.nasa.gov/details/PIA22329",
+      "photo": { "nasaId": "PIA22329", "alt": "Map of Mars with a big dust storm spreading over it", "credit": "NASA/JPL-Caltech/MSSS" }
     },
     {
       "id": "conjunction",
       "title": "Sun in the way",
       "kind": "milestone",
-      "hint": "Live through the radio blackout"
+      "hint": "Live through the radio blackout",
+      "fact": "About every 26 months, Mars passes almost directly behind the Sun as seen from Earth. This is called solar conjunction.",
+      "link": "https://images.nasa.gov/details/PIA16811",
+      "photo": { "nasaId": "PIA16811", "alt": "Diagram: the Sun sits between Earth and Mars on their orbits", "credit": "NASA/JPL-Caltech" }
     }
   ]
 }

@@ -1,7 +1,9 @@
 // Engine rules, determinism, win/lose and a full simulated mission per mode.
+import { existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import factsFile from '../src/data/facts.json';
 import {
-  MODES, addProblem, applyPlan, cardDef, cards, cfg, cellsAvailable, createMission, crewById, donki, endMission, enterMedbay, eventChoices, go, jobAllowed,
+  MODES, addProblem, applyPlan, cardDef, cards, cfg, cellsAvailable, createMission, crewById, donki, endMission, facts, enterMedbay, eventChoices, go, jobAllowed,
   planTotal, playSol, proceed, radioCanSend, sendMessage, startPlanning, wordCount,
   type GameState, type Job, type Plan, type SystemId,
 } from '../src/engine';
@@ -48,6 +50,24 @@ describe('same Mars for everyone', () => {
 });
 
 describe('real NASA data', () => {
+  it('OSDR facts are real: not a stub, 10-15 of them, each with an OSDR study link', () => {
+    expect(factsFile.stub).toBe(false);
+    expect(facts.length).toBeGreaterThanOrEqual(10);
+    expect(facts.length).toBeLessThanOrEqual(15);
+    for (const f of facts) {
+      expect(f.link).toBe(`https://osdr.nasa.gov/bio/repo/data/studies/${f.osd}`);
+      expect(f.text.length).toBeGreaterThan(20);
+    }
+  });
+  it('every album card has a NASA photo file, a fact and a source link', () => {
+    for (const k of cards) {
+      expect(existsSync(`src/assets/cards/${k.id}.jpg`), k.id).toBe(true);
+      expect(k.fact.length, k.id).toBeGreaterThan(20);
+      expect(k.link, k.id).toMatch(/^https:\/\/(images\.nasa\.gov|osdr\.nasa\.gov)\//);
+      expect(k.photo.alt.length, k.id).toBeGreaterThan(5);
+      expect(k.photo.credit, k.id).toMatch(/^NASA/);
+    }
+  });
   it('DONKI data is not a stub and every record has a source link', () => {
     expect(donki.stub).toBe(false);
     for (const p of donki.periods) for (const e of p.events) expect(e.link).toMatch(/^https:\/\//);

@@ -1,8 +1,9 @@
 // Typed access to the JSON data files. Engine code reads data only through here.
-import type { CardDef, CardKind, ChanceDef, CrewDef, DonkiEvent, DonkiFile, DonkiPeriod, Mode, ProblemDef, Role, SystemDef, SystemId, TroubleDef, Weather } from './types';
+import type { CardDef, CardKind, ChanceDef, Fact, CrewDef, DonkiEvent, DonkiFile, DonkiPeriod, Mode, ProblemDef, Role, SystemDef, SystemId, TroubleDef, Weather } from './types';
 import balanceJson from '../data/balance.json';
 import eventsJson from '../data/events.json';
 import cardsJson from '../data/cards.json';
+import factsJson from '../data/facts.json';
 import textJson from '../data/en.json';
 import donkiJson from '../data/donki-periods.json';
 
@@ -32,7 +33,20 @@ export const botBalance = balanceJson.bot;
 
 export const troubles = eventsJson.troubles as Record<string, TroubleDef>;
 export const chances = eventsJson.chances as Record<string, ChanceDef>;
-export const cards = cardsJson.cards as CardDef[];
+export const facts = factsJson.facts as Fact[];
+type RawCard = Omit<CardDef, 'fact' | 'source' | 'link'> & { fact?: string; link?: string; factId?: string };
+/** A card's fact is either its own (from the photo's NASA caption) or an OSDR fact from facts.json. */
+function resolveCard(c: RawCard): CardDef {
+  const { factId, ...rest } = c;
+  if (factId) {
+    const f = facts.find((x) => x.id === factId);
+    if (!f) throw new Error(`Card ${c.id}: unknown fact ${factId}`);
+    return { ...rest, fact: f.text, source: `NASA OSDR, ${f.osd}: ${f.study}`, link: f.link };
+  }
+  if (!c.fact || !c.link) throw new Error(`Card ${c.id}: needs fact + link or factId`);
+  return { ...rest, fact: c.fact, source: `NASA Image Library, ${c.photo.nasaId}`, link: c.link };
+}
+export const cards = (cardsJson.cards as RawCard[]).map(resolveCard);
 export const crewDefs = textJson.crew as CrewDef[];
 export const words = textJson.words as Record<string, string>;
 export const missionNames = { a: textJson.missionNameA, b: textJson.missionNameB };
