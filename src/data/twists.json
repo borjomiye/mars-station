@@ -31,13 +31,13 @@
       "id": "veterans",
       "name": "Veteran crew",
       "plus": "Experienced: 3 heavy sols in a row before anyone gets tired",
-      "minus": "They already got 3 mSv of radiation on earlier missions",
+      "minus": "They already got 2 mSv of radiation on earlier missions",
       "patch": {
         "set": {
           "HEAVY_SOLS_TO_TIRED": 3
         },
         "add": {
-          "START_DOSE": 3
+          "START_DOSE": 2
         }
       }
     },

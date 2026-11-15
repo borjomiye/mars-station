@@ -3,7 +3,8 @@
   "_sources": {
     "DOSE_INDOOR_PER_SOL": "Curiosity RAD: an average of 0.67 mSv per day on the surface, August 2012 to June 2013 (NASA news release 9 Dec 2013; Hassler et al., Science 343, 2014, doi:10.1126/science.1244797). Verified 2026-11-15, see src/data/radlab-iss.json.",
     "STORM_MULT_BY_DAY": "Curiosity saw a 2-3x rise for about two days in Sept 2017 (NASA/JPL). Game value.",
-    "BADGE_AMBER_MSV": "Game thresholds, not NASA limits. Say so on the data screen."
+    "BADGE_AMBER_MSV": "Game thresholds, not NASA limits. Say so on the data screen.",
+    "SHIELD_DAILY_CUT": "Game simplification: thick shielding also blocks a little of the everyday cosmic-ray dose (it helps far less than against solar particle storms). Say so on the data screen."
   },
   "base": {
     "MISSION_SOLS": 15,
@@ -105,7 +106,7 @@
     "RED_BADGE_GROUNDS": true,
     "LAB_WORK_PER_SAMPLE": 2,
     "CHANCE_SAMPLES": 1,
-    "SCIENCE_TARGET": 22,
+    "SCIENCE_TARGET": 24,
     "SCIENCE_PER_CARD": {
       "chance": 3,
       "lab": 2,
@@ -219,10 +220,11 @@
     "THIRD_STAR_RULE": "both",
     "HELPER_ALWAYS_ON": false,
     "SHOW_MSV": true,
-    "STORMY_PERIOD_CHANCE": 0.75,
+    "STORMY_PERIOD_CHANCE": 0.9,
     "MAX_REAL_EVENTS_PER_SOL": 2,
     "START_DOSE": 0,
-    "TASKS_PER_MISSION": 2
+    "TASKS_PER_MISSION": 2,
+    "SHIELD_DAILY_CUT": 0.3
   },
   "modes": {
     "easy": {
@@ -236,7 +238,7 @@
       "AUTO_FORECAST_SOLS": 1,
       "HELPER_ALWAYS_ON": true,
       "SHOW_MSV": false,
-      "SCIENCE_TARGET": 20
+      "SCIENCE_TARGET": 23
     },
     "medium": {
       "AIR_START": 8,
@@ -246,14 +248,18 @@
         1.5
       ],
       "AUTO_FORECAST_SOLS": 1,
-      "HELPER_ALWAYS_ON": true
+      "HELPER_ALWAYS_ON": true,
+      "BADGE_AMBER_MSV": 12,
+      "BADGE_RED_MSV": 14
     },
     "hard": {
       "AIR_START": 6,
       "FOOD_START": 5,
       "ZERO_SOLS_TO_LOSE": 1,
-      "SCIENCE_TARGET": 23,
-      "AIR_LOSS_PER_MISSING_CELL": 2
+      "SCIENCE_TARGET": 19,
+      "AIR_LOSS_PER_MISSING_CELL": 2,
+      "BADGE_AMBER_MSV": 10,
+      "BADGE_RED_MSV": 13
     }
   },
   "bot": {

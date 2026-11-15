@@ -99,7 +99,7 @@
     "helper.stormTodayAndTheShield": "Storm today and the shield is weak. Everyone gets extra dose.",
     "helper.theLabIsDarkCan": "The lab is dark. {name} can't work there without power.",
     "helper.theRadioNeedsCellTo": "The radio needs {want} cell to send tonight's message. The lab needs {want2} cells or no science happens.",
-    "helper.theShieldOnlyMattersWhen": "The shield ({want}) only matters when a solar storm hits. The greenhouse grows 1 crop step per cell; {cropStepsToHarvest} steps = harvest, Food +{harvestFood}.",
+    "helper.theShieldOnlyMattersWhen": "The shield ({want}) matters most when a solar storm hits; at full power it also trims the everyday dose a little. The greenhouse grows 1 crop step per cell; {cropStepsToHarvest} steps = harvest, Food +{harvestFood}.",
     "helper.theSkySetsTodayS": "The sky sets today's energy: clear {clear} cells, hazy {hazy}, dust storm {dust}.",
     "helper.theSunBlocksTheRadio": "The Sun blocks the radio today. Earth cannot hear us.",
     "helper.theSystemsWantMoreCells": "The systems want more cells than the Sun gives, so something always goes short.",

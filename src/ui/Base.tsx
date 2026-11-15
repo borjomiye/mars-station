@@ -61,7 +61,7 @@ export function PlanBase({ s, onCells, onJob, onDone }: PlanProps) {
   const [why, setWhy] = useState(false);
   const effect = (k: SystemId, n: number, short: number): string => {
     if (k === 'life') return short > 0 ? `Air −${short * c.AIR_LOSS_PER_MISSING_CELL} tonight` : short < 0 ? `Air +${-short * c.AIR_GAIN_PER_EXTRA_CELL} tonight` : 'Air stays level';
-    if (k === 'shield') return !st ? 'No storm: not needed' : short <= 0 ? 'Storm dose: minimum' : `Storm dose: ${c.SHOW_MSV ? fmt2(doseFor(c, st, 'rest', n).d) + ' mSv' : 'higher'}`;
+    if (k === 'shield') return !st ? (short <= 0 ? `Everyday dose -${Math.round(c.SHIELD_DAILY_CUT * 100)}%` : n > 0 ? 'Everyday dose a bit lower' : 'No storm: everyday dose') : short <= 0 ? 'Storm dose: minimum' : `Storm dose: ${c.SHOW_MSV ? fmt2(doseFor(c, st, 'rest', n).d) + ' mSv' : 'higher'}`;
     if (k === 'greenhouse') return n > 0 ? `Crop +${n * c.STEPS_PER_GREENHOUSE_CELL} steps` : 'Crops wait';
     if (k === 'radio') return isBlackout(s) ? 'Blackout today' : radioBlocked(s) ? 'Antenna is off' : short <= 0 ? 'Message tonight' : n > 0 ? `1 more cell to send` : 'Radio off';
     return short <= 0 ? 'Samples → cards' : n > 0 ? 'Half speed' : 'Lab off';
