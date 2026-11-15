@@ -2,7 +2,7 @@
 // (typed line by line), and a board shows space weather, the station and what is new today.
 // Tap the bubble to finish a line. Reduced motion shows all lines at once.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { cfg, fmt, getMorning, knownForecast, type GameState, type Weather } from '../engine';
+import { cfg, fmt, getMorning, knownForecast, siteDef, taskDef, taskText, twistDef, type GameState, type Weather } from '../engine';
 import { icon, robotArt, scene } from './art';
 import { BeatLine, beatsOf, talkOf, type Beat } from './bits';
 import { sfx, useScreenSounds } from './sound';
@@ -69,6 +69,7 @@ export function MorningScreen({ s, onNext }: { s: GameState; onNext: () => void 
       <div className="brief-board">
         <SpaceWeather s={s} />
         <Status s={s} />
+        {(s.sol === 1 || (m.news ?? []).length > 0) && s.tasks.length > 0 && <MissionControl s={s} />}
         {(m.unlocked.length > 0 || m.words.length > 0) && <NewToday unlocked={m.unlocked} words={m.words} />}
       </div>
 
@@ -177,6 +178,36 @@ function Status({ s }: { s: GameState }) {
   );
 }
 
+/** Mission Control: the landing site and twist on sol 1, and the tasks with their status. */
+function MissionControl({ s }: { s: GameState }) {
+  const site = s.siteId ? siteDef(s.siteId) : null, tw = s.twistId ? twistDef(s.twistId) : null;
+  return (
+    <section className="brief-sec rule" aria-labelledby="brief-mc">
+      <div className="brief-label">
+        <img src={icon('radio')} alt="" />
+        <h2 id="brief-mc">MISSION CONTROL</h2>
+      </div>
+      <div className="brief-mc">
+        {s.sol === 1 && site && tw && (
+          <p className="brief-mc-setup" title={`${site.plus}. ${site.minus}. ${tw.plus}. ${tw.minus}.`}>Landed in <b>{site.name}</b> · Twist: <b>{tw.name}</b> <span>(details: Tasks button)</span></p>
+        )}
+        <ul className="brief-tasks">
+          {s.tasks.map((x) => {
+            const d = taskDef(x.id);
+            return (
+              <li key={x.id} className={x.status}>
+                <span className="brief-tag">{x.status === 'done' ? 'DONE' : x.status === 'failed' ? 'MISSED' : 'TASK'}</span>
+                <span>{taskText(d)}</span>
+                <b>+{d.reward} science</b>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
 function NewToday({ unlocked, words }: { unlocked: string[]; words: string[] }) {
   return (
     <section className="brief-sec rule" aria-labelledby="brief-new">
@@ -186,7 +217,7 @@ function NewToday({ unlocked, words }: { unlocked: string[]; words: string[] }) 
       </div>
       <div className="brief-new">
         {unlocked.length > 0 && (
-          <p className="brief-unlock"><span>New today:</span> <strong>{unlocked.join(', ')}!</strong> <span className="brief-tag">NEW</span></p>
+          <p className="brief-unlock"><span>Opens today:</span> <strong>{unlocked.join(', ')}!</strong> <span className="brief-tag">NEW</span></p>
         )}
         {words.map((w) => <p key={w} className="brief-word"><span className="brief-tag word">NEW WORD</span> {w}</p>)}
       </div>

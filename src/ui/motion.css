@@ -120,3 +120,11 @@
   .task:nth-child(2) { animation-delay: 0.08s; }
   .task.done .task-mark { animation: icon-pulse 0.8s steps(2) 3; }
 }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Mission Control calls attention: the tasks button glints, the pinned list slides in */
+  .tasks-btn { animation: tasks-glint 2.4s steps(1, end) 3; }
+  @keyframes tasks-glint { 50% { box-shadow: 0 0 0 3px var(--text), 0 5px 0 3px var(--mars-dark); } }
+  .task-pin { animation: slide-left 0.45s 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.1) both; }
+  @keyframes slide-left { from { opacity: 0; transform: translateX(40px); } }
+}
