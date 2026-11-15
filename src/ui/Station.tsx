@@ -18,8 +18,8 @@ const dome = board.layers.dome;
 // every flickering thing (dim room, dome, people inside) follows one switch, so lights and faces blink together
 const FLICKER_MS = 800;
 const reducedMotion = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-const PROBLEM_ROOM: Record<string, RoomId> = { loose_pipe: 'workshop', pump_broken: 'workshop', lamp_fault: 'greenhouse', antenna_off: 'radio', hull_crack: 'lab' };
-const JOB_ICON: Record<Job, string> = { grow: 'food', fix: 'repair', outside: 'helmet', lab: 'science', care: 'medbay', rest: 'sleep' };
+export const PROBLEM_ROOM: Record<string, RoomId> = { loose_pipe: 'workshop', pump_broken: 'workshop', lamp_fault: 'greenhouse', antenna_off: 'radio', hull_crack: 'lab' };
+const JOB_ICON: Record<Job, string> = { grow: 'crop', fix: 'repair', outside: 'helmet', lab: 'science', care: 'medbay', rest: 'sleep' };
 
 type RoomState = 'locked' | 'dark' | 'dim' | 'on';
 
@@ -37,9 +37,13 @@ type Props = {
   onSelect?: (crewId: string | null) => void;      // tap a person (plan phase)
   onJob?: (crewId: string, job: Job) => void;
   overlay?: ReactNode;                             // things drawn on top (helper bubble, results)
+  notes?: Partial<Record<RoomId | 'outside', Note[]>>; // what each room did this sol, shown over it
 };
 
-export function Station({ s, height, selected, onSelect, onJob, overlay }: Props) {
+/** A result shown over a room after the sol: short text, an icon, good or bad. */
+export type Note = { text: string; icon: string; tone: 'good' | 'bad' | 'plain' };
+
+export function Station({ s, height, selected, onSelect, onJob, overlay, notes }: Props) {
   const c = cfg(s.mode), day = today(s), st = stormOn(s), { cells, jobs } = layoutOf(s);
   const dusty = day.weather === 'dust' || s.problems.some((p) => p.type === 'dusty_panels');
   const top = height - (board.board.h + BOTTOM) * K;           // station board top in px
@@ -165,6 +169,20 @@ export function Station({ s, height, selected, onSelect, onJob, overlay }: Props
       ))}
       {(groups.outside ?? []).map((cid, i) => figure(cid, X(-GUTTER + 40 + i * 46), Y(GROUND + 22 + (i % 2) * 8), true, 'right'))}
 
+      {notes && (Object.keys(notes) as (RoomId | 'outside')[]).map((id, k) => {
+        const list = notes[id] ?? [];
+        if (!list.length) return null;
+        const r = id === 'outside' ? { x: -GUTTER + 6, y: GROUND - 150, w: GUTTER + 10, h: 100 } : board.rooms[id];
+        return (
+          <ul key={id} className="st-notes" style={{ left: X(r.x + r.w / 2), top: Y(r.y) + (id === 'greenhouse' ? 44 : 30) }} aria-label={id === 'outside' ? 'Outside' : board.rooms[id].name}>
+            {list.map((n, i) => (
+              <li key={i} className={`st-note ${n.tone}`} style={{ animationDelay: `${(k * 3 + i) * 0.18}s` }}>
+                <img src={icon(n.icon)} alt="" />{n.text}
+              </li>
+            ))}
+          </ul>
+        );
+      })}
       {overlay}
     </section>
   );

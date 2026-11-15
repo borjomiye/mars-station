@@ -1,5 +1,6 @@
 // The game, one 1280×720 screen at a time: title → morning → base (plan) → event → results → evening → … → report.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { buttonSound } from './sound';
 import {
   applyPlan, backToPlan, clearChoice, confirmPlan, createMission, eventChoices, playSol, proceed, randomMissionName, resolveEvent, sendMessage, startPlanning,
   type GameState, type Job, type Mode, type SystemId,
@@ -25,8 +26,18 @@ export default function App() {
   const [mode, setMode] = useState<Mode>('easy');
   const [manual, setManual] = useState<{ sol: number; ids: string[] }>({ sol: 0, ids: [] }); // jobs the captain set by hand this sol
 
+  const [beforeSol, setBeforeSol] = useState<GameState | null>(null); // state just before the sol was played, to show what changed
+
+  // every button clicks by itself (see sound.ts); buttons with their own sound say data-sfx="…"
+  useEffect(() => {
+    const on = (e: MouseEvent) => buttonSound(e.target);
+    document.addEventListener('click', on, true);
+    return () => document.removeEventListener('click', on, true);
+  }, []);
+
   /** Every engine step goes through here: save the mission, keep found cards in the album. */
   const set = (next: GameState) => {
+    if (next.phase === 'results' && s && s.phase !== 'results') setBeforeSol(s);
     setPicking(null);
     setState(next);
     saveGame(next);
@@ -75,7 +86,7 @@ export default function App() {
       <div className="screen in-sol">
         <Hud s={s} onMenu={toMenu} onData={() => setWin('data')} />
         {s.phase === 'plan' && <PlanBase s={s} onCells={setCells} onJob={setJob} onDone={() => set(confirmPlan(s))} />}
-        {s.phase === 'results' && <ResultsBase s={s} onNext={() => set(proceed(s))} />}
+        {s.phase === 'results' && <ResultsBase s={s} prev={beforeSol && beforeSol.sol === s.sol ? beforeSol : null} onNext={() => set(proceed(s))} />}
         {s.phase === 'event' && (
           <EventScreen
             s={s} picking={picking} onChoose={choose} onTogglePick={togglePick}

@@ -4,6 +4,23 @@ import {
   type Badge, type CrewMember, type GameState, type RealEvent,
 } from '../engine';
 import { crewArt, icon } from './art';
+import { setMuted, useMuted } from './sound';
+
+/** Sound on/off: a pixel speaker, with waves when on and a cross when off. The choice is remembered. */
+export function SoundToggle({ className }: { className: string }) {
+  const muted = useMuted();
+  return (
+    <button className={className} data-sfx="none" aria-pressed={!muted} aria-label={muted ? 'Sound is off. Turn sound on' : 'Sound is on. Turn sound off'}
+      title={muted ? 'Sound off' : 'Sound on'} onClick={() => setMuted(!muted)}>
+      <svg viewBox="0 0 12 12" width="22" height="22" shapeRendering="crispEdges" aria-hidden="true">
+        <path fill="currentColor" d="M1 4h2v4H1zM3 3h1v6H3zM4 2h1v8H4zM5 1h1v10H5z" />
+        {muted
+          ? <path fill="currentColor" d="M7 4h1v1H7zM8 5h1v1H8zM9 6h1v1H9zM10 7h1v1h-1zM10 4h1v1h-1zM9 5h1v1H9zM8 6h1v1H8zM7 7h1v1H7z" />
+          : <path fill="currentColor" d="M7 5h1v2H7zM8 3h1v1H8zM9 4h1v4H9zM8 8h1v1H8zM10 2h1v1h-1zM11 3h1v6h-1zM10 9h1v1h-1z" />}
+      </svg>
+    </button>
+  );
+}
 
 // ---------- top bar ----------
 
@@ -43,7 +60,8 @@ export function Hud({ s, onMenu, onData }: { s: GameState; onMenu: () => void; o
         <span className="flag" title="The ship home"><img src={icon('ship-home')} alt="" />{Math.max(0, c.MISSION_SOLS - s.sol)} sols</span>
       </div>
       <div className="hud-buttons">
-        <button className="secondary small" onClick={onData} aria-label="Where the data comes from">i</button>
+        <SoundToggle className="secondary small sound-btn" />
+        <button className="secondary small" data-sfx="open" onClick={onData} aria-label="Where the data comes from">i</button>
         <button className="secondary small" onClick={onMenu}>Menu</button>
       </div>
     </header>

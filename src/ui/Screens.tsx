@@ -6,7 +6,10 @@ import {
 } from '../engine';
 import { useState } from 'react';
 import { cardPhoto, crewArt, eventScene, icon, robotArt, scene } from './art';
-import { CrewCard, badgeIcon } from './bits';
+import { CrewCard, SoundToggle, badgeIcon } from './bits';
+import { choiceIcon } from './choiceIcons';
+import { MissionPatch } from './Patch';
+import { sfx, useScreenSounds } from './sound';
 
 // ---------- title ----------
 
@@ -24,12 +27,13 @@ export function TitleScreen(p: TitleProps) {
       <img className="title-robot" src={robotArt('robot-point')} alt="" />
 
       <nav className="title-corner" aria-label="More">
-        <button className="corner-btn" onClick={p.onAlbum} aria-label={`Album, ${p.albumCount} of ${cards.length} collected`}>
+        <SoundToggle className="corner-btn" />
+        <button className="corner-btn" data-sfx="open" onClick={p.onAlbum} aria-label={`Album, ${p.albumCount} of ${cards.length} collected`}>
           <img src={icon('card-back')} alt="" />
           <span className="corner-badge" aria-hidden="true">{p.albumCount}/{cards.length}</span>
           <span className="corner-tip" aria-hidden="true">Album</span>
         </button>
-        <button className="corner-btn" onClick={p.onData} aria-label="Where the data comes from">
+        <button className="corner-btn" data-sfx="open" onClick={p.onData} aria-label="Where the data comes from">
           <svg viewBox="0 0 14 14" shapeRendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M2 11h10v1H2zM3 7h2v4H3zM6 4h2v7H6zM9 2h2v9H9z" /></svg>
           <span className="corner-tip" aria-hidden="true">Where the data comes from</span>
         </button>
@@ -46,6 +50,7 @@ export function TitleScreen(p: TitleProps) {
         <div className="title-step">
           <label className="step-label" htmlFor="mission-name"><span className="step-num" aria-hidden="true">1</span>Name your mission</label>
           <div className="name-field">
+            <MissionPatch name={p.name} size={44} />
             <input
               id="mission-name" value={p.name} maxLength={24} autoComplete="off" placeholder="Brave Otter"
               onChange={(e) => p.setName(e.target.value.replace(/[^\p{L}\p{N} -]/gu, ''))}
@@ -69,13 +74,13 @@ export function TitleScreen(p: TitleProps) {
           </div>
         </div>
 
-        <button className="launch" onClick={p.onLaunch}>
+        <button className="launch" data-sfx="launch" onClick={p.onLaunch}>
           <span className="step-num" aria-hidden="true">3</span>
           Launch mission
           <svg viewBox="0 0 12 12" shapeRendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M8 1h2v1h1v2h-1v1H9v1H8v1H7v1H6V7H5V6H4V5h1V4h1V3h1V2h1zM2 6h2v1H2zM5 9h1v2H5zM2 8h2v1H3v1H2z" /></svg>
         </button>
         <div className="title-more">
-          <button className="ghost" onClick={() => setHelp(true)}>How to play</button>
+          <button className="ghost" data-sfx="open" onClick={() => setHelp(true)}>How to play</button>
           {p.saved && <button className="ghost" onClick={p.onContinue}>Continue {p.saved.name} · sol {p.saved.sol}</button>}
         </div>
       </main>
@@ -85,7 +90,7 @@ export function TitleScreen(p: TitleProps) {
           <div className="overlay-box" role="dialog" aria-modal="true" aria-labelledby="htp-title" onClick={(e) => e.stopPropagation()}>
             <div className="overlay-head">
               <h2 id="htp-title">How to play</h2>
-              <button className="secondary small" onClick={() => setHelp(false)} aria-label="Close" autoFocus>X</button>
+              <button className="secondary small" data-sfx="close" onClick={() => setHelp(false)} aria-label="Close" autoFocus>X</button>
             </div>
             <ol className="overlay-body htp-steps">
               <li><span className="step-num">1</span>[Placeholder] Read the morning report for the sol.</li>
@@ -108,6 +113,8 @@ type EventProps = {
 };
 export function EventScreen({ s, picking, onChoose, onTogglePick, onPickConfirm, onPickCancel, onChange, onBack, onPlay }: EventProps) {
   const c = cfg(s.mode), ev = currentEvent(s), list = eventChoices(s), ch = s.today.choice, st = stormOn(s);
+  // the event announces itself: a storm rumbles, trouble beeps, a chance sparkles
+  useScreenSounds(() => (ev ? [[150, ev.id === 'solar_storm' ? sfx.storm : ev.kind === 'trouble' ? sfx.alarm : sfx.chance]] : []), [ev?.id, s.sol]);
   if (!ev) return null;
   const sick = ev.id === 'sick_crew' && s.today.sickId ? crewById(s, s.today.sickId) : null;
   const title = sick ? `${sick.name} feels ill` : ev.id === 'solar_storm' && st && st.day > 0 ? `Solar storm, day ${st.day + 1}` : ev.title;
@@ -143,7 +150,7 @@ export function EventScreen({ s, picking, onChoose, onTogglePick, onPickConfirm,
                 const after = p.dose + doseFor(c, st, pickDef.pick!.job, shield).d, b = badgeOf(c, after);
                 const power = repairNeed !== null ? workPower(c, p, 'fix') : null;
                 return (
-                  <button key={p.id} className={`pick${on ? ' on' : ''}`} disabled={!can} aria-pressed={on} onClick={() => onTogglePick(p.id)}>
+                  <button key={p.id} className={`pick${on ? ' on' : ''}`} data-sfx="none" disabled={!can} aria-pressed={on} onClick={() => { sfx.pick(!on); onTogglePick(p.id); }}>
                     <span className="pick-tip"><CrewCard s={s} p={p} /></span>
                     <span className="portrait"><img src={crewArt(p.id, 'portrait')} alt="" className={`role-${p.role}`} /></span>
                     <b>{p.name}</b>
@@ -171,8 +178,8 @@ export function EventScreen({ s, picking, onChoose, onTogglePick, onPickConfirm,
               {list.map((o) => (
                 <button key={o.id} className="choice" disabled={!o.enabled} onClick={() => onChoose(o.id)}>
                   <b>{o.label}</b>
-                  <span className="plus">+ {o.plus}</span>
-                  <span className="minus">− {o.minus}</span>
+                  <span className="plus"><img src={icon(choiceIcon(o.plus, 'plus'))} alt="" />+ {o.plus}</span>
+                  <span className="minus"><img src={icon(choiceIcon(o.minus, 'minus'))} alt="" />− {o.minus}</span>
                   {!o.enabled && <span className="muted">({o.why})</span>}
                   {o.enabled && o.dose !== null && <span className="muted">Dose today: {c.SHOW_MSV ? `${fmt2(o.dose)} mSv each` : o.dose <= c.DOSE_INDOOR_PER_SOL + 0.01 ? 'the minimum' : 'more than usual'}</span>}
                   {o.enabled && o.pick && <span className="muted">You pick who goes</span>}
@@ -201,6 +208,7 @@ export function EventScreen({ s, picking, onChoose, onTogglePick, onPickConfirm,
 // ---------- evening call ----------
 
 export function RadioScreen({ s, onSend }: { s: GameState; onSend: (id: RadioMessageId | null) => void }) {
+  useScreenSounds(() => [[120, sfx.staticHiss]], [s.sol]);
   return (
     <div className="screen radio">
       <img className="screen-bg" src={scene('scene-interior')} alt="" />
@@ -211,10 +219,10 @@ export function RadioScreen({ s, onSend }: { s: GameState; onSend: (id: RadioMes
         </div>
         <div className="choice-row two">
           {messageOptions(s).map((m) => (
-            <button key={m.id} className="choice" disabled={!m.enabled} onClick={() => onSend(m.id)}>
+            <button key={m.id} className="choice" data-sfx="radio" disabled={!m.enabled} onClick={() => onSend(m.id)}>
               <b>“{m.label}”</b>
-              <span className="plus">+ {m.plus}</span>
-              <span className="minus">− {m.minus}</span>
+              <span className="plus"><img src={icon(choiceIcon(m.plus, 'plus'))} alt="" />+ {m.plus}</span>
+              <span className="minus"><img src={icon(choiceIcon(m.minus, 'minus'))} alt="" />− {m.minus}</span>
               {!m.enabled && <span className="muted">({m.why})</span>}
             </button>
           ))}
@@ -232,47 +240,64 @@ const RealLine = ({ e }: { e: RealEvent }) => <li><b>{e.date} · {e.label}</b> <
 
 export function ReportScreen({ s, album, onAgain, onNew }: { s: GameState; album: string[]; onAgain: () => void; onNew: () => void }) {
   const r = endMission(s);
+  // stars drop in one by one (timed with their animation), then the ship lands; an early return starts with a gentle "aww"
+  useScreenSounds(() => [
+    ...(r.won ? [] : [[150, sfx.lose] as [number, () => void]]),
+    ...r.stars.flatMap((on, i): [number, () => void][] => (on ? [[(r.won ? 300 : 900) + i * 350 + 120, () => sfx.star(i)]] : [])),
+    ...(r.won ? [[300 + 3 * 350 + 150, sfx.win] as [number, () => void]] : []),
+  ], [s.name, s.sol]);
   const weight = (e: RealEvent) => (e.type === 'SEP' ? 0 : e.label.startsWith('Solar flare X') ? 1 : e.note.includes('heading for Mars') && !e.note.includes('not') ? 2 : 3);
-  const top = r.real.slice().sort((a, b) => weight(a) - weight(b) || a.sol - b.sol).slice(0, 3).sort((a, b) => a.sol - b.sol);
+  const top = r.real.slice().sort((a, b) => weight(a) - weight(b) || a.sol - b.sol).slice(0, 2).sort((a, b) => a.sol - b.sol);
+  const c = cfg(s.mode), iss = doseComparison.iss.perDayMSv, issDay = (iss.min + iss.max) / 2;
+  const avgDose = r.doses.reduce((a, d) => a + d.dose, 0) / Math.max(1, r.doses.length);
+  const issDays = Math.max(1, Math.round(avgDose / issDay));
+  // one thing to try next time: the first star that was missed, or a harder mode
+  const missed = r.stars.findIndex((on) => !on);
+  const tryNext = missed >= 0 ? (missed === 0 ? r.mattered : r.hints[missed]) : s.mode !== 'hard' ? 'All three stars! Try a harder mode next.' : 'All three stars on Hard. A true Mars captain!';
   return (
     <div className="screen report">
       <img className="report-banner" src={scene(r.won ? 'scene-victory' : 'scene-failure')} alt="" />
       <div className="report-head">
+        <MissionPatch name={s.name} size={84} />
         <div>
-          <h1>Captain's report · Mission {s.name}</h1>
+          <h1>Mission {s.name}</h1>
           <p><b>{r.won ? 'The ship landed. Mission complete!' : `Mission Control called the crew home early on sol ${r.sol}. Everyone is safe.`}</b></p>
         </div>
-        <div className="report-stars" role="img" aria-label={`${r.starCount} of 3 stars`}>{r.stars.map((on, i) => <img key={i} src={icon(on ? 'star' : 'star-empty')} alt="" />)}</div>
+        <div className="report-stars" role="img" aria-label={`${r.starCount} of 3 stars`}>{r.stars.map((on, i) => <img key={i} src={icon(on ? 'star' : 'star-empty')} alt="" className={on ? 'on' : ''} style={{ animationDelay: `${(r.won ? 0.3 : 0.9) + i * 0.35}s` }} />)}</div>
       </div>
       <div className="report-body">
         <div className="report-col">
           <ul className="star-list">
-            {r.stars.map((on, i) => <li key={i}><img src={icon(on ? 'star' : 'star-empty')} alt="" /><span><b>{STAR_NAMES[i]}</b> {on ? <span className="good">earned</span> : <span className="alert">{r.hints[i]}</span>}</span></li>)}
+            {r.stars.map((on, i) => <li key={i} className={on ? 'on' : ''}><img src={icon(on ? 'star' : 'star-empty')} alt="" /><b>{STAR_NAMES[i]}</b></li>)}
           </ul>
-          {!r.won && <p className="alert"><b>What mattered most:</b> {r.mattered}</p>}
-          <p><b>Science sent home: {r.science} / {r.target}</b> · cards {r.found.length} found, {r.sent.length} sent · album {album.length}/{cards.length}</p>
-          <h3>Real NASA events in your mission</h3>
-          <ul className="real-list">{top.length ? top.map((e) => <RealLine key={e.id + e.sol} e={e} />) : <li className="muted">none reached</li>}</ul>
+          <p className="try-next"><img src={icon('tip')} alt="" /><span><b>Try next:</b> {tryNext}</span></p>
+          <p className="report-science"><img src={icon('science')} alt="" />Science sent home: <b>{r.science} / {r.target}</b> · album {album.length}/{cards.length}</p>
+          {top.length > 0 && (
+            <>
+              <h3>Real NASA events in your mission</h3>
+              <ul className="real-list">{top.map((e) => <RealLine key={e.id + e.sol} e={e} />)}</ul>
+            </>
+          )}
         </div>
         <div className="report-col">
-          <h3>Radiation dose over {plural(r.sol, 'sol')}</h3>
-          <table>
-            <tbody>
-              {r.doses.map((d) => {
-                const p = s.crew.find((q) => q.name === d.name);
-                return (
-                  <tr key={d.name}>
-                    <td><span className="portrait small"><img src={crewArt(p?.id ?? 'leo', 'portrait')} alt="" className={`role-${d.role}`} /></span></td>
-                    <th scope="row">{d.name}</th>
-                    <td>{fmt2(d.dose)} mSv</td>
-                    <td><img className="mini" src={badgeIcon(d.badge)} alt="" /> {d.badge}</td>
-                    <td className="muted">{plural(d.trips, 'trip')} · {plural(d.medbaySols, 'medbay sol')}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <p className="muted small-text">mSv (millisievert) measures radiation dose. The game speeds time up.</p>
+          <h3>Your crew</h3>
+          <ul className="crew-badges">
+            {r.doses.map((d) => {
+              const p = s.crew.find((q) => q.name === d.name);
+              return (
+                <li key={d.name}>
+                  <span className="portrait"><img src={crewArt(p?.id ?? 'leo', 'portrait')} alt="" className={`role-${d.role}`} /></span>
+                  <b>{d.name}</b>
+                  <span className="crew-badge"><img src={badgeIcon(d.badge)} alt="" />{d.badge}</span>
+                  {c.SHOW_MSV && <span className="muted">{fmt2(d.dose)} mSv</span>}
+                </li>
+              );
+            })}
+          </ul>
+          <p className="iss-line">
+            <img src={icon('iss')} alt="" />
+            <span>Each of your crew got about as much radiation as <b>{plural(issDays, 'day')}</b> on the Space Station. <a href={doseComparison.iss.link} target="_blank" rel="noreferrer">NASA</a></span>
+          </p>
         </div>
       </div>
       <div className="report-buttons">
@@ -286,6 +311,7 @@ export function ReportScreen({ s, album, onAgain, onNew }: { s: GameState; album
 // ---------- windows ----------
 
 const KIND_NAME: Record<CardKind, string> = { chance: 'Mars find', lab: 'Lab find', milestone: 'Milestone' };
+const KIND_ICON: Record<CardKind, string> = { chance: 'rock-sample', lab: 'science', milestone: 'star' };
 
 /** Found cards show their real NASA photo; a click opens the photo with its fact and sources. */
 export function AlbumView({ album }: { album: string[] }) {
@@ -326,7 +352,7 @@ export function AlbumView({ album }: { album: string[] }) {
           </button>
         ) : (
           <div key={k.id} className="album-card">
-            <img src={icon('card-back')} alt="" />
+            <img className="album-silhouette" src={icon(KIND_ICON[k.kind])} alt="" />
             <b>???</b>
             <span className="muted">{k.hint}</span>
           </div>

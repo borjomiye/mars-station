@@ -32,7 +32,7 @@ export function Overlay({ title, onClose, children, wide }: { title: string; onC
       <div className={`overlay-box${wide ? ' wide' : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="overlay-head">
           <h2>{title}</h2>
-          <button className="secondary small" onClick={onClose} aria-label="Close">✕</button>
+          <button className="secondary small" data-sfx="close" onClick={onClose} aria-label="Close">✕</button>
         </div>
         <div className="overlay-body">{children}</div>
       </div>

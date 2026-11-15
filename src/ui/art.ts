@@ -52,7 +52,7 @@ export function roomOf(crewId: string, job: EffectiveJob): RoomId | 'outside' {
 }
 
 /** Icon for a system, the same one the plan rows and the HUD use. */
-export const SYSTEM_ICON: Record<SystemId, string> = { life: 'air', shield: 'shield', greenhouse: 'food', radio: 'radio', lab: 'science' };
+export const SYSTEM_ICON: Record<SystemId, string> = { life: 'air', shield: 'shield', greenhouse: 'crop', radio: 'radio', lab: 'science' };
 
 /** Picture for the event of today, by engine event id. Never call this before the event is revealed. */
 export function eventScene(id: string, s: GameState): string {
